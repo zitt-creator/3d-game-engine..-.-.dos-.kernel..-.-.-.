@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Z.ITT DOS 5.0 - 3D-DOS-GAME-ENGINE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; user-select: none; touch-action: manipulation; }
+        body { background-color: #020205; color: #fff; font-family: 'Press Start 2P', monospace; margin: 0; padding: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .crt-overlay::before {
+            content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 20; background-size: 100% 4px, 6px 100%; pointer-events: none;
+        }
+        .dos-btn { background-color: #0000AA; border: 3px outset #55FFFF; color: #FFF; cursor: pointer; transition: all 0.05s; box-shadow: 2px 2px 0px #000; }
+        .dos-btn:hover { background-color: #0000D5; }
+        .dos-btn:active { border-style: inset; background-color: #FFFF55; color: #000; }
+    </style>
+</head>
+<body>
+    <div id="game-container" class="crt-overlay relative flex flex-col w-full max-w-4xl bg-black rounded-lg border-4 border-cyan-700 shadow-2xl p-2 my-auto">
+        <!-- DOS TITLE BAR -->
+        <div class="bg-[#000088] text-white px-3 py-2 flex justify-between items-center text-xs sm:text-sm border-b-2 border-cyan-400">
+            <div class="flex items-center gap-2">
+                <span class="text-[#FFFF55]">Z.ITT DOS v5.0</span>
+                <span class="hidden sm:inline text-[#55FFFF]">| Z.ITTDOS50.EXE (π=1)</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div>SCORE: <span id="ui-score" class="text-[#55FF55]">00000</span></div>
+                <div>HEALTH: <span id="ui-health" class="text-[#FFFF55]">100%</span></div>
+            </div>
+        </div>
+
+        <!-- VIEWPORT CONTAINER -->
+        <div id="viewport-container" class="relative w-full aspect-[4/3] bg-black flex justify-center items-center overflow-hidden border-2 border-cyan-900">
+            <!-- Three.js / Canvas Target -->
+            <div id="three-container" class="absolute inset-0 w-full h-full"></div>
+
+            <!-- OVERLAY MENU -->
+            <div id="overlay-screen" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center p-6 text-center z-30">
+                <h1 class="text-xl sm:text-3xl text-yellow-400 mb-3 tracking-wider">3D----DOS-GAME--e n g i n e..  . ./.</h1>
+                <p class="text-xs sm:text-sm text-cyan-300 mb-6 max-w-lg leading-relaxed">
+                    post-process..  . .c.pile./.<br>
+                    Physics State: <span class="text-yellow-300">room == π ÷ 2 (π=1)</span>
+                </p>
+                <button id="btn-start" class="dos-btn px-6 py-3 text-sm font-bold tracking-wider">INITIALIZE COMBAT KERNEL</button>
+            </div>
+        </div>
+
+        <!-- DOS BOTTOM STATUS BAR -->
+        <div class="bg-[#000088] p-2 mt-1 flex justify-between items-center text-[10px] sm:text-xs border-t-2 border-cyan-400">
+            <div>MODE: <span class="text-[#55FFFF]">Z.ITT----DOS--5.0</span></div>
+            <div>STATUS: <span class="text-[#55FF55]">ONLINE</span></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('btn-start').addEventListener('click', () => {
+            document.getElementById('overlay-screen').classList.add('hidden');
+            initCombatArena();
+        });
+
+        function initCombatArena() {
+            const container = document.getElementById('three-container');
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020208);
+            scene.fog = new THREE.FogExp2(0x020208, 0.03);
+
+            const camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 3, 10);
+            camera.lookAt(0, 1, 0);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0x55ffff, 1.0);
+            dirLight.position.set(5, 10, 5);
+            scene.add(dirLight);
+
+            // Arena Floor
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(25, 25),
+                new THREE.MeshStandardMaterial({ color: 0x0b0f19, roughness: 0.3, metalness: 0.8 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            scene.add(floor);
+
+            scene.add(new THREE.GridHelper(25, 25, 0x00ffff, 0x1f2937));
+
+            // Fighter Models
+            const createFighter = (color, x) => {
+                const group = new THREE.Group();
+                const torso = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.2, 1.8, 0.7),
+                    new THREE.MeshStandardMaterial({ color, roughness: 0.2 })
+                );
+                torso.position.y = 1.9;
+                group.add(torso);
+                group.position.x = x;
+                scene.add(group);
+                return group;
+            };
+
+            const p1 = createFighter(0x06b6d4, -2.5);
+            const p2 = createFighter(0xef4444, 2.5);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                p1.rotation.y += 0.01;
+                p2.rotation.y -= 0.01;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+    </script>
+</body>
+</html>
