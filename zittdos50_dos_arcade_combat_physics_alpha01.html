@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Z.ITT DOS 5.0 - STREET STRIKER 3D v0.1--physics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #020206; color: #55ffff;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .dos-font { font-family: 'Press Start 2P', monospace; }
+        .crt-container {
+            position: relative; width: 100%; height: 100%; overflow: hidden;
+        }
+        .crt-container::before {
+            content: " "; display: block; position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.5) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 25; background-size: 100% 4px, 6px 100%; pointer-events: none;
+        }
+        .c-pile-postprocess {
+            filter: contrast(125%) brightness(1.1) saturate(1.2);
+            box-shadow: inset 0 0 90px rgba(0, 255, 255, 0.2);
+        }
+        .dos-bg-blue { background-color: #0000aa; }
+        .dos-btn {
+            background-color: #0000aa; border: 2px outset #55ffff; color: #ffffff; cursor: pointer;
+            transition: all 0.05s; box-shadow: 2px 2px 0px #000000;
+        }
+        .dos-btn:hover { background-color: #0000d5; }
+        .dos-btn:active, .dos-btn.active { border-style: inset; background-color: #ffff55; color: #000000; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .analogue-container {
+            width: 120px; height: 120px; background: rgba(0, 0, 140, 0.5);
+            border: 2px solid #55ffff; border-radius: 50%; position: relative; touch-action: none;
+        }
+        .analogue-stick {
+            width: 48px; height: 48px; background: radial-gradient(circle, #ffff55 20%, #0000aa 80%);
+            border: 2px solid #ffffff; border-radius: 50%; position: absolute;
+            top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none;
+        }
+        .touch-btn {
+            background: rgba(0, 0, 170, 0.8); border: 2px solid #55ffff; color: #ffff55;
+            font-family: 'Press Start 2P', monospace; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; touch-action: none;
+        }
+        .touch-btn:active, .touch-btn.active { background: rgba(255, 255, 85, 0.95); color: #000000; border-color: #ffffff; }
+    </style>
+</head>
+<body class="w-screen h-screen overflow-hidden bg-black flex justify-center items-center">
+    <div id="app-container" class="crt-container c-pile-postprocess w-full h-full flex flex-col justify-between p-1 sm:p-2">
+        <div class="dos-bg-blue text-white px-3 py-2 flex justify-between items-center text-xs border-b-2 border-cyan-400 z-10 flex-shrink-0 shadow-lg">
+            <div class="flex items-center gap-2">
+                <span class="dos-text-yellow dos-font text-[10px] sm:text-xs">Z.ITT DOS 5.0</span>
+                <span class="hidden md:inline dos-text-cyan">| Street Striker 3D [47]</span>
+            </div>
+            <div class="flex items-center gap-4 text-xs dos-font">
+                <div>ROOM: <span class="text-yellow-300">π ÷ 2</span></div>
+                <div>TIME: <span id="hud-timer" class="text-emerald-400">99</span></div>
+                <div>FPS: <span id="hud-fps" class="text-cyan-300">60</span></div>
+            </div>
+        </div>
+        <div class="relative flex-1 w-full bg-black overflow-hidden border-2 border-cyan-900 my-1">
+            <div id="canvas-container"></div>
+            <div id="p1-combo" class="absolute top-24 left-12 text-2xl sm:text-4xl font-black italic text-yellow-400 dos-font opacity-0 transition-all pointer-events-none z-10">0 HITS!</div>
+            <div id="p2-combo" class="absolute top-24 right-12 text-2xl sm:text-4xl font-black italic text-cyan-400 dos-font opacity-0 transition-all pointer-events-none z-10">0 HITS!</div>
+            <div id="announcer" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl sm:text-5xl font-black italic text-yellow-300 dos-font tracking-wider opacity-0 transition-all duration-300 pointer-events-none z-20 text-center drop-shadow-[0_4px_16px_rgba(255,0,85,0.9)]">READY</div>
+            <div id="touch-overlay" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-2 sm:p-4 z-20">
+                <div class="flex justify-between items-center opacity-90 pointer-events-auto">
+                    <button id="btn-touch-reorient" class="dos-btn px-2.5 py-1 text-[9px] dos-font bg-amber-900">🎯 REORIENT (π=1)</button>
+                    <button id="btn-touch-options" class="dos-btn px-2.5 py-1 text-[9px] dos-font">⚙️ OPTIONS</button>
+                </div>
+                <div class="flex justify-between items-end w-full gap-2 pointer-events-auto">
+                    <div id="analogue-zone" class="analogue-container">
+                        <div id="analogue-knob" class="analogue-stick"></div>
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <div class="grid grid-cols-3 gap-1.5 w-52 h-24">
+                            <button id="btn-atk-p" class="touch-btn text-[9px] bg-blue-900/85">PUNCH [F]</button>
+                            <button id="btn-atk-k" class="touch-btn text-[9px] bg-red-900/85">KICK [G]</button>
+                            <button id="btn-atk-s" class="touch-btn text-[9px] bg-amber-900/85">SPECIAL [H]</button>
+                        </div>
+                        <button id="btn-jump" class="touch-btn py-2.5 text-[10px] bg-cyan-900/85 w-full">JUMP [SPACE]</button>
+                    </div>
+                </div>
+            </div>
+            <div id="menu-modal" class="absolute inset-0 bg-black/92 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-30">
+                <h1 class="text-xl sm:text-3xl text-yellow-400 mb-2 dos-font tracking-wider">STREET STRIKER 3D</h1>
+                <p class="text-xs text-cyan-300 mb-5 max-w-md leading-relaxed">
+                    Z.ITT DOS 5.0 c.pile Arcade Engine.<br>
+                    State: <span class="text-emerald-400">room == π ÷ 2 (π=1)</span> | C-Pile Post-Process Pipeline.
+                </p>
+                <div class="w-full max-w-md bg-blue-950/85 border-2 border-cyan-400 p-3 rounded mb-5 text-left space-y-2 text-xs">
+                    <div class="text-yellow-400 font-bold dos-font text-[10px] border-b border-cyan-700 pb-1 mb-2">⚡ SYSTEM KERNEL CONFIGURATION</div>
+                    <div class="flex justify-between items-center">
+                        <span>PI PHYSICS CONSTANT:</span>
+                        <button id="cfg-pi-toggle" class="dos-btn px-2 py-1 text-[10px] dos-font bg-cyan-900">π = 1.0 (DOS)</button>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>C-PILE POST-PROCESS:</span>
+                        <button id="cfg-c-pile-toggle" class="dos-btn px-2 py-1 text-[10px] dos-font bg-emerald-900">ENABLED</button>
+                    </div>
+                </div>
+                <div class="flex gap-3 justify-center">
+                    <button id="btn-start" class="dos-btn px-6 py-3 text-xs font-bold dos-font">START COMBAT</button>
+                    <button id="btn-reorient-main" class="dos-btn px-4 py-3 text-xs dos-font bg-amber-900">RESET ORIGIN</button>
+                </div>
+            </div>
+        </div>
+        <div class="dos-bg-blue p-2.5 flex flex-col gap-1.5 border-t-2 border-cyan-400 text-xs flex-shrink-0 shadow-lg">
+            <div class="flex justify-between items-center text-xs px-2 py-1.5 bg-black/75 rounded border border-blue-900">
+                <div class="w-[44%] flex flex-col gap-1">
+                    <div class="flex justify-between font-bold dos-font text-[10px] text-red-400">
+                        <span>PLAYER 1</span><span id="p1-hp-text">100%</span>
+                    </div>
+                    <div class="w-full bg-black h-3 border border-red-500/50 rounded overflow-hidden">
+                        <div id="p1-health" class="h-full bg-gradient-to-r from-red-600 to-amber-500 w-full transition-all"></div>
+                    </div>
+                    <div class="w-full bg-black h-1.5 border border-yellow-500/30 rounded overflow-hidden">
+                        <div id="p1-energy" class="h-full bg-yellow-300 w-0 transition-all"></div>
+                    </div>
+                </div>
+                <div class="dos-font text-yellow-300 text-sm font-bold">VS</div>
+                <div class="w-[44%] flex flex-col gap-1">
+                    <div class="flex justify-between font-bold dos-font text-[10px] text-cyan-400">
+                        <span id="p2-hp-text">100%</span><span>CPU MBOT</span>
+                    </div>
+                    <div class="w-full bg-black h-3 border border-cyan-500/50 rounded overflow-hidden">
+                        <div id="p2-health" class="h-full bg-gradient-to-l from-blue-600 to-cyan-400 w-full transition-all"></div>
+                    </div>
+                    <div class="w-full bg-black h-1.5 border border-yellow-500/30 rounded overflow-hidden">
+                        <div id="p2-energy" class="h-full bg-yellow-300 w-0 transition-all"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-between items-center text-[9px] sm:text-[10px] text-cyan-200 px-1 gap-1">
+                <span>🎮 Move: Joystick / WASD | Jump: Space | Punch: F | Kick: G | Special: H</span>
+                <button id="btn-reset-pos" class="dos-btn px-2 py-0.5 text-[9px] dos-font bg-amber-900">🎯 RESET POS</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const TextureGenerator = {
+            createGridTexture: function(width = 512, height = 512) {
+                const canvas = document.createElement('canvas');
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#060a16'; ctx.fillRect(0, 0, width, height);
+                ctx.strokeStyle = '#004477'; ctx.lineWidth = 4;
+                for (let x = 0; x <= width; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+                for (let y = 0; y <= height; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+                ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 6; ctx.strokeRect(6, 6, width - 12, height - 12);
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+                return texture;
+            },
+            createFighterSkin: function(primary, accent) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = primary; ctx.fillRect(0, 0, 256, 256);
+                ctx.fillStyle = accent;
+                ctx.fillRect(0, 0, 256, 36); ctx.fillRect(0, 120, 256, 20);
+                ctx.fillRect(32, 36, 64, 64); ctx.fillRect(160, 36, 64, 64);
+                return new THREE.CanvasTexture(canvas);
+            }
+        };
+
+        class SoundFX {
+            constructor() { this.ctx = null; }
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+            playHit(isHeavy = false) {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = isHeavy ? 'triangle' : 'square';
+                const freq = isHeavy ? 110 : 220;
+                osc.frequency.setValueAtTime(freq, t);
+                osc.frequency.exponentialRampToValueAtTime(25, t + 0.16);
+                gain.gain.setValueAtTime(0.45, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.16);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t); osc.stop(t + 0.16);
+            }
+            playSpecial() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.linearRampToValueAtTime(700, t + 0.45);
+                gain.gain.setValueAtTime(0.4, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.45);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t); osc.stop(t + 0.45);
+            }
+        }
+
+        const audio = new SoundFX();
+        const STAGE_W = 24; const STAGE_D = 12; const GRAVITY = -38;
+        let scene, camera, renderer;
+        let p1, p2;
+        let clock = new THREE.Clock();
+        let gameActive = false;
+        let matchTimer = 99;
+        let timerInterval = null;
+        let particles = [];
+        let piConstant = 1.0;
+        let cPileEnabled = true;
+        const keys = {};
+        const analogue = { x: 0, y: 0, active: false };
+
+        class Fighter {
+            constructor(id, color, accent, startX, isCPU = false) {
+                this.id = id; this.isCPU = isCPU;
+                this.hp = 100; this.energy = 0; this.combo = 0; this.comboTimer = 0;
+                this.velocity = new THREE.Vector3();
+                this.isGrounded = true; this.isAttacking = false; this.isHit = false;
+                this.attackType = null; this.attackFrame = 0; this.hitCooldown = 0;
+
+                this.mesh = new THREE.Group();
+                const texture = TextureGenerator.createFighterSkin(color, accent);
+                const mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3, metalness: 0.4 });
+
+                const torsoGeo = new THREE.BoxGeometry(1.2, 1.6, 0.8);
+                this.torso = new THREE.Mesh(torsoGeo, mat);
+                this.torso.position.y = 2.4; this.torso.castShadow = true;
+                this.mesh.add(this.torso);
+
+                const headGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+                const headMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.2 });
+                this.head = new THREE.Mesh(headGeo, headMat);
+                this.head.position.set(0, 1.2, 0); this.head.castShadow = true;
+                this.torso.add(this.head);
+
+                const limbMat = new THREE.MeshStandardMaterial({ color: 0x11111f, roughness: 0.5 });
+                const armGeo = new THREE.BoxGeometry(0.4, 1.2, 0.4);
+                this.rArm = new THREE.Mesh(armGeo, mat);
+                this.rArm.position.set(-0.9, 0.2, 0); this.torso.add(this.rArm);
+                this.lArm = new THREE.Mesh(armGeo, mat);
+                this.lArm.position.set(0.9, 0.2, 0); this.torso.add(this.lArm);
+
+                const legGeo = new THREE.BoxGeometry(0.5, 1.4, 0.5);
+                this.rLeg = new THREE.Mesh(legGeo, limbMat);
+                this.rLeg.position.set(-0.4, -1.4, 0); this.torso.add(this.rLeg);
+                this.lLeg = new THREE.Mesh(legGeo, limbMat);
+                this.lLeg.position.set(0.4, -1.4, 0); this.torso.add(this.lLeg);
+
+                this.mesh.position.set(startX, 0, 0);
+                scene.add(this.mesh);
+            }
+
+            update(dt, opponent) {
+                if (this.hitCooldown > 0) this.hitCooldown -= dt;
+                if (this.comboTimer > 0) {
+                    this.comboTimer -= dt;
+                    if (this.comboTimer <= 0) { this.combo = 0; this.updateComboUI(); }
+                }
+
+                const piScale = (piConstant === 1.0) ? 1.0 : (Math.PI / 3.14159);
+                this.velocity.y += GRAVITY * dt * piScale;
+                this.mesh.position.addScaledVector(this.velocity, dt);
+
+                if (this.mesh.position.y <= 0) {
+                    this.mesh.position.y = 0; this.velocity.y = 0; this.isGrounded = true;
+                }
+
+                this.mesh.position.x = THREE.MathUtils.clamp(this.mesh.position.x, -STAGE_W/2 + 1, STAGE_W/2 - 1);
+                this.mesh.position.z = THREE.MathUtils.clamp(this.mesh.position.z, -STAGE_D/2 + 1, STAGE_D/2 - 1);
+
+                if (!this.isAttacking && !this.isHit) {
+                    const dir = opponent.mesh.position.x - this.mesh.position.x;
+                    this.mesh.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+                }
+
+                this.animate(dt);
+                if (this.isCPU && gameActive) this.updateAI(opponent, dt);
+            }
+
+            animate(dt) {
+                if (this.isHit) { this.torso.rotation.x = -0.4; return; }
+                if (this.isAttacking) {
+                    this.attackFrame += dt * 16;
+                    if (this.attackType === 'punch') {
+                        this.rArm.rotation.x = -Math.PI / 2;
+                        this.rArm.position.z = Math.sin(this.attackFrame) * 0.8;
+                        if (this.attackFrame > Math.PI) this.endAttack();
+                    } else if (this.attackType === 'kick') {
+                        this.rLeg.rotation.x = -Math.PI / 1.8;
+                        this.rLeg.position.z = Math.sin(this.attackFrame) * 1.2;
+                        if (this.attackFrame > Math.PI) this.endAttack();
+                    } else if (this.attackType === 'special') {
+                        this.torso.rotation.y = Math.sin(this.attackFrame * 2) * 0.6;
+                        if (this.attackFrame > Math.PI * 1.5) this.endAttack();
+                    }
+                } else {
+                    this.torso.rotation.set(0,0,0);
+                    this.rArm.position.set(-0.9, 0.2, 0); this.lArm.position.set(0.9, 0.2, 0);
+                    this.rLeg.position.set(-0.4, -1.4, 0); this.lLeg.position.set(0.4, -1.4, 0);
+                }
+            }
+
+            attack(type, opponent) {
+                if (this.isAttacking || this.isHit || !this.isGrounded) return;
+                this.isAttacking = true; this.attackType = type; this.attackFrame = 0;
+                let range = 2.3, damage = 10, isHeavy = false;
+                if (type === 'kick') { damage = 18; range = 2.7; isHeavy = true; }
+                else if (type === 'special') {
+                    if (this.energy < 50) { this.endAttack(); return; }
+                    this.energy -= 50; this.updateEnergyUI();
+                    damage = 32; range = 4.5; isHeavy = true;
+                    audio.playSpecial();
+                    spawnSpecialFX(this.mesh.position, this.mesh.rotation.y);
+                }
+                audio.playHit(isHeavy);
+                const dist = this.mesh.position.distanceTo(opponent.mesh.position);
+                if (dist <= range) {
+                    opponent.takeDamage(damage, this);
+                    spawnImpactFX(opponent.mesh.position.clone().add(new THREE.Vector3(0, 2, 0)));
+                    this.energy = Math.min(100, this.energy + 20);
+                    this.updateEnergyUI();
+                }
+            }
+
+            endAttack() {
+                this.isAttacking = false; this.attackType = null;
+                this.rArm.rotation.set(0,0,0); this.rLeg.rotation.set(0,0,0);
+            }
+
+            takeDamage(amount, attacker) {
+                if (this.hitCooldown > 0) return;
+                this.hp = Math.max(0, this.hp - amount);
+                this.isHit = true; this.hitCooldown = 0.3;
+                const pushDir = this.mesh.position.x > attacker.mesh.position.x ? 1 : -1;
+                this.velocity.x = pushDir * (amount * 0.35);
+                this.velocity.y = amount * 0.18;
+                attacker.combo++; attacker.comboTimer = 2.0; attacker.updateComboUI();
+                this.updateHealthUI();
+                setTimeout(() => { this.isHit = false; }, 300);
+                if (this.hp <= 0) endMatch(attacker.id === 'p1' ? 'PLAYER 1 WINS!' : 'CPU MBOT WINS!');
+            }
+
+            updateAI(opponent, dt) {
+                const dist = this.mesh.position.distanceTo(opponent.mesh.position);
+                if (dist > 3.2) {
+                    this.velocity.x = (opponent.mesh.position.x > this.mesh.position.x ? 1 : -1) * 5.5;
+                } else if (dist < 1.5) {
+                    this.velocity.x = (opponent.mesh.position.x > this.mesh.position.x ? -1 : 1) * 4.5;
+                } else {
+                    this.velocity.x = 0;
+                }
+                if (dist < 3.4 && Math.random() < 0.06) {
+                    const moves = ['punch', 'kick'];
+                    if (this.energy >= 50) moves.push('special');
+                    this.attack(moves[Math.floor(Math.random() * moves.length)], opponent);
+                }
+            }
+
+            updateHealthUI() {
+                document.getElementById(`${this.id}-health`).style.width = `${this.hp}%`;
+                document.getElementById(`${this.id}-hp-text`).innerText = `${Math.ceil(this.hp)}%`;
+            }
+
+            updateEnergyUI() {
+                document.getElementById(`${this.id}-energy`).style.width = `${this.energy}%`;
+            }
+
+            updateComboUI() {
+                const elem = document.getElementById(`${this.id}-combo`);
+                if (this.combo > 1) { elem.innerText = `${this.combo} HITS!`; elem.style.opacity = '1'; }
+                else { elem.style.opacity = '0'; }
+            }
+        }
+
+        function spawnImpactFX(pos) {
+            const count = 18; const geom = new THREE.BufferGeometry();
+            const positions = [], vels = [];
+            for (let i = 0; i < count; i++) {
+                positions.push(pos.x, pos.y, pos.z);
+                vels.push((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+            }
+            geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            const mat = new THREE.PointsMaterial({ color: 0xffff00, size: 0.4, transparent: true, opacity: 1 });
+            const ps = new THREE.Points(geom, mat); scene.add(ps);
+            particles.push({ mesh: ps, vels, life: 0.28 });
+        }
+
+        function spawnSpecialFX(pos, rotY) {
+            const geom = new THREE.SphereGeometry(1.2, 16, 16);
+            const mat = new THREE.MeshBasicMaterial({ color: 0x55ffff, wireframe: true });
+            const sph = new THREE.Mesh(geom, mat);
+            sph.position.copy(pos); sph.position.y += 2.0; scene.add(sph);
+            const dir = Math.sin(rotY); let distance = 0;
+            const iv = setInterval(() => {
+                sph.position.x += dir * 0.8; sph.scale.multiplyScalar(1.08); distance += 0.8;
+                if (distance > 12) { scene.remove(sph); clearInterval(iv); }
+            }, 20);
+        }
+
+        function initScene() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x020206, 0.012);
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 4, 18);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true; container.appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+            const dirLight = new THREE.DirectionalLight(0xffeedd, 1.3);
+            dirLight.position.set(12, 22, 16); dirLight.castShadow = true; scene.add(dirLight);
+
+            const floorGeo = new THREE.BoxGeometry(STAGE_W + 4, 1, STAGE_D + 4);
+            const floorMat = new THREE.MeshStandardMaterial({
+                map: TextureGenerator.createGridTexture(512, 512), roughness: 0.25, metalness: 0.8
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.position.y = -0.5; floor.receiveShadow = true; scene.add(floor);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function handleInput() {
+            if (!p1 || !gameActive || p1.isHit) return;
+            const speed = 7.5; p1.velocity.x = 0; p1.velocity.z = 0;
+            if (keys['KeyA']) p1.velocity.x = -speed;
+            if (keys['KeyD']) p1.velocity.x = speed;
+            if (keys['KeyW']) p1.velocity.z = -speed * 0.6;
+            if (keys['KeyS']) p1.velocity.z = speed * 0.6;
+            if (analogue.active) {
+                p1.velocity.x = analogue.x * speed; p1.velocity.z = analogue.y * speed * 0.6;
+            }
+            if (keys['Space'] && p1.isGrounded) { p1.velocity.y = 13.5; p1.isGrounded = false; }
+            if (keys['KeyF']) p1.attack('punch', p2);
+            if (keys['KeyG']) p1.attack('kick', p2);
+            if (keys['KeyH']) p1.attack('special', p2);
+        }
+
+        function updateCamera() {
+            if (!p1 || !p2) return;
+            const mid = new THREE.Vector3().addVectors(p1.mesh.position, p2.mesh.position).multiplyScalar(0.5);
+            const dist = p1.mesh.position.distanceTo(p2.mesh.position);
+            const targetPos = new THREE.Vector3(mid.x, Math.max(3.2, mid.y + 2.6), Math.max(12, dist * 1.05 + 5));
+            camera.position.lerp(targetPos, 0.1); camera.lookAt(mid.x, mid.y + 1.2, mid.z);
+        }
+
+        function startMatch() {
+            document.getElementById('menu-modal').style.display = 'none'; audio.init();
+            if (p1) scene.remove(p1.mesh); if (p2) scene.remove(p2.mesh);
+            p1 = new Fighter('p1', '#d92b2b', '#ffaa00', -4, false);
+            p2 = new Fighter('p2', '#2b66d9', '#00ffee', 4, true);
+            matchTimer = 99; document.getElementById('hud-timer').innerText = matchTimer;
+            const announcer = document.getElementById('announcer');
+            announcer.innerText = 'ROUND 1 • FIGHT!'; announcer.style.opacity = '1';
+            gameActive = true;
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                matchTimer--; document.getElementById('hud-timer').innerText = matchTimer;
+                if (matchTimer <= 0) endMatch('TIME OVER - DRAW!');
+            }, 1000);
+            setTimeout(() => { announcer.style.opacity = '0'; }, 1500);
+        }
+
+        function endMatch(msg) {
+            gameActive = false; clearInterval(timerInterval);
+            const announcer = document.getElementById('announcer');
+            announcer.innerText = msg; announcer.style.opacity = '1';
+            setTimeout(() => {
+                announcer.style.opacity = '0';
+                document.getElementById('menu-modal').style.display = 'flex';
+                document.getElementById('btn-start').innerText = 'REMATCH';
+            }, 3000);
+        }
+
+        function setupAnalogueJoystick() {
+            const zone = document.getElementById('analogue-zone');
+            const knob = document.getElementById('analogue-knob');
+            const maxRadius = 38;
+            const handleTouch = (clientX, clientY) => {
+                const rect = zone.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                let dx = clientX - centerX; let dy = clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+                if (dist > maxRadius) { dx = (dx / dist) * maxRadius; dy = (dy / dist) * maxRadius; }
+                knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                analogue.x = dx / maxRadius; analogue.y = dy / maxRadius; analogue.active = true;
+            };
+            const resetStick = () => {
+                knob.style.transform = `translate(-50%, -50%)`;
+                analogue.x = 0; analogue.y = 0; analogue.active = false;
+            };
+            zone.addEventListener('touchstart', e => { e.preventDefault(); handleTouch(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+            zone.addEventListener('touchmove', e => { e.preventDefault(); handleTouch(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+            zone.addEventListener('touchend', e => { e.preventDefault(); resetStick(); }, {passive: false});
+            zone.addEventListener('mousedown', e => {
+                const moveHandler = ev => handleTouch(ev.clientX, ev.clientY);
+                const upHandler = () => { resetStick(); window.removeEventListener('mousemove', moveHandler); window.removeEventListener('mouseup', upHandler); };
+                handleTouch(e.clientX, e.clientY);
+                window.addEventListener('mousemove', moveHandler); window.addEventListener('mouseup', upHandler);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1);
+            if (gameActive) {
+                handleInput(); p1.update(dt, p2); p2.update(dt, p1);
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const ps = particles[i]; ps.life -= dt;
+                    if (ps.life <= 0) { scene.remove(ps.mesh); particles.splice(i, 1); continue; }
+                    const pos = ps.mesh.geometry.attributes.position.array;
+                    for (let j = 0; j < ps.vels.length / 3; j++) {
+                        pos[j*3] += ps.vels[j*3] * dt;
+                        pos[j*3+1] += ps.vels[j*3+1] * dt;
+                        pos[j*3+2] += ps.vels[j*3+2] * dt;
+                    }
+                    ps.mesh.geometry.attributes.position.needsUpdate = true;
+                }
+            }
+            updateCamera();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        document.getElementById('btn-start').addEventListener('click', startMatch);
+        document.getElementById('btn-reorient-main').addEventListener('click', () => { if(p1) p1.mesh.position.set(-4,0,0); if(p2) p2.mesh.position.set(4,0,0); });
+        document.getElementById('btn-reset-pos').addEventListener('click', () => { if(p1) p1.mesh.position.set(-4,0,0); if(p2) p2.mesh.position.set(4,0,0); });
+        document.getElementById('btn-touch-reorient').addEventListener('click', () => { if(p1) p1.mesh.position.set(-4,0,0); if(p2) p2.mesh.position.set(4,0,0); });
+        document.getElementById('btn-touch-options').addEventListener('click', () => { gameActive = false; document.getElementById('menu-modal').style.display = 'flex'; });
+
+        document.getElementById('cfg-pi-toggle').addEventListener('click', () => {
+            piConstant = (piConstant === 1.0) ? 3.14159 : 1.0;
+            document.getElementById('cfg-pi-toggle').innerText = (piConstant === 1.0) ? 'π = 1.0 (DOS)' : 'π = 3.14 (STANDARD)';
+        });
+
+        document.getElementById('cfg-c-pile-toggle').addEventListener('click', () => {
+            cPileEnabled = !cPileEnabled;
+            const container = document.getElementById('app-container');
+            if (cPileEnabled) container.classList.add('c-pile-postprocess');
+            else container.classList.remove('c-pile-postprocess');
+            document.getElementById('cfg-c-pile-toggle').innerText = cPileEnabled ? 'ENABLED' : 'DISABLED';
+        });
+
+        document.getElementById('btn-jump').addEventListener('touchstart', e => { e.preventDefault(); keys['Space'] = true; }, {passive:false});
+        document.getElementById('btn-jump').addEventListener('touchend', e => { e.preventDefault(); keys['Space'] = false; }, {passive:false});
+        document.getElementById('btn-atk-p').addEventListener('touchstart', e => { e.preventDefault(); if(p1) p1.attack('punch', p2); }, {passive:false});
+        document.getElementById('btn-atk-k').addEventListener('touchstart', e => { e.preventDefault(); if(p1) p1.attack('kick', p2); }, {passive:false});
+        document.getElementById('btn-atk-s').addEventListener('touchstart', e => { e.preventDefault(); if(p1) p1.attack('special', p2); }, {passive:false});
+
+        window.onload = () => {
+            initScene();
+            setupAnalogueJoystick();
+            animate();
+        };
+    </script>
+</body>
+</html>
