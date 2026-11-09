@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Z.ITT DOS  ----  street--striker  3d-combat----basic player vs bot engine  ----  alpha01</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts for Arcade Aesthetics -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #05050b;
+            color: #fff;
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* CRT Scanlines & Retro Arcade Glow Post-Processing Overlay */
+        .crt-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .crt-container::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 60, 0.04), rgba(0, 255, 200, 0.02), rgba(0, 60, 255, 0.04));
+            z-index: 25;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+        .arcade-glow {
+            filter: contrast(125%) brightness(1.1) saturate(1.3);
+            box-shadow: inset 0 0 120px rgba(0, 255, 255, 0.15);
+        }
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        /* Analogue Touch Controller Pad */
+        .analogue-container {
+            width: 130px;
+            height: 130px;
+            background: rgba(10, 15, 35, 0.65);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            border-radius: 50%;
+            position: relative;
+            touch-action: none;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.25);
+        }
+        .analogue-stick {
+            width: 54px;
+            height: 54px;
+            background: radial-gradient(circle, #00ffff 10%, #0044aa 80%);
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+        }
+        .arcade-btn {
+            background: linear-gradient(135deg, rgba(0, 40, 100, 0.85), rgba(0, 15, 40, 0.95));
+            border: 2px solid rgba(0, 255, 255, 0.6);
+            color: #00ffff;
+            font-family: 'Orbitron', sans-serif;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            transition: all 0.05s ease;
+        }
+        .arcade-btn:active, .arcade-btn.active {
+            background: linear-gradient(135deg, #00ffff, #0088cc);
+            color: #000000;
+            border-color: #ffffff;
+            transform: scale(0.95);
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.85);
+        }
+        .arcade-btn-red {
+            border-color: rgba(255, 50, 80, 0.8);
+            color: #ff3355;
+        }
+        .arcade-btn-red:active, .arcade-btn-red.active {
+            background: linear-gradient(135deg, #ff3355, #ff8800);
+            color: #ffffff;
+        }
+        .arcade-btn-amber {
+            border-color: rgba(255, 180, 0, 0.8);
+            color: #ffaa00;
+        }
+        .arcade-btn-amber:active, .arcade-btn-amber.active {
+            background: linear-gradient(135deg, #ffaa00, #ffff00);
+            color: #000000;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen overflow-hidden bg-black flex justify-center items-center">
+    <div class="crt-container arcade-glow w-full h-full flex flex-col justify-between p-2 sm:p-4">
+        
+        <!-- Top HUD Header -->
+        <div class="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-blue-950/90 via-black/90 to-indigo-950/90 border-b-2 border-cyan-500/60 rounded-t-xl z-10 shadow-2xl backdrop-blur-md">
+            <!-- Player 1 HUD -->
+            <div class="w-[42%] flex flex-col gap-1.5">
+                <div class="flex justify-between items-end font-bold orbitron text-xs sm:text-sm text-red-500 tracking-wider">
+                    <span>PLAYER 1</span>
+                    <span id="p1-hp-text" class="text-white text-base">100%</span>
+                </div>
+                <div class="w-full bg-black/80 h-4 border border-red-500/60 rounded overflow-hidden shadow-inner p-0.5">
+                    <div id="p1-health" class="h-full bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 w-full transition-all duration-150 rounded-sm"></div>
+                </div>
+                <div class="w-full bg-black/80 h-2 border border-yellow-500/40 rounded overflow-hidden p-0.5">
+                    <div id="p1-energy" class="h-full bg-gradient-to-r from-yellow-400 to-white w-0 transition-all duration-150 rounded-sm"></div>
+                </div>
+            </div>
+
+            <!-- Timer Box -->
+            <div class="flex flex-col items-center">
+                <div class="px-4 py-1.5 bg-black/95 border-2 border-cyan-400 rounded-lg orbitron text-xl sm:text-2xl font-black text-cyan-300 shadow-[0_0_15px_rgba(0,255,255,0.4)]">
+                    <span id="hud-timer">99</span>
+                </div>
+                <div class="text-[9px] tracking-widest text-cyan-500 mt-0.5 orbitron">ROUND 1</div>
+            </div>
+
+            <!-- Player 2 HUD -->
+            <div class="w-[42%] flex flex-col gap-1.5">
+                <div class="flex justify-between items-end font-bold orbitron text-xs sm:text-sm text-cyan-400 tracking-wider">
+                    <span id="p2-hp-text" class="text-white text-base">100%</span>
+                    <span>CPU ARENA BOT</span>
+                </div>
+                <div class="w-full bg-black/80 h-4 border border-cyan-500/60 rounded overflow-hidden shadow-inner p-0.5 flex justify-end">
+                    <div id="p2-health" class="h-full bg-gradient-to-l from-blue-600 via-cyan-500 to-teal-300 w-full transition-all duration-150 rounded-sm"></div>
+                </div>
+                <div class="w-full bg-black/80 h-2 border border-yellow-500/40 rounded overflow-hidden p-0.5 flex justify-end">
+                    <div id="p2-energy" class="h-full bg-gradient-to-l from-yellow-400 to-white w-0 transition-all duration-150 rounded-sm"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Central 3D Canvas & Overlays Viewport -->
+        <div class="relative flex-1 w-full bg-black overflow-hidden my-1 rounded-xl border border-cyan-900/60">
+            <div id="canvas-container"></div>
+            
+            <!-- Combo Popups -->
+            <div id="p1-combo" class="absolute top-20 left-12 text-3xl sm:text-5xl font-black italic orbitron text-yellow-400 opacity-0 transition-all duration-150 pointer-events-none z-10 drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)]">0 HITS!</div>
+            <div id="p2-combo" class="absolute top-20 right-12 text-3xl sm:text-5xl font-black italic orbitron text-cyan-300 opacity-0 transition-all duration-150 pointer-events-none z-10 drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)]">0 HITS!</div>
+
+            <!-- Center Announcement Banner -->
+            <div id="announcer" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl sm:text-6xl font-black italic orbitron text-yellow-300 tracking-wider opacity-0 transition-all duration-300 pointer-events-none z-20 text-center drop-shadow-[0_0_25px_rgba(255,0,85,0.9)]">READY</div>
+
+            <!-- Touch Controls & Analogue Stick Overlay -->
+            <div id="touch-overlay" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-20">
+                <!-- Top HUD Actions inside Arena -->
+                <div class="flex justify-between items-center pointer-events-auto">
+                    <button id="btn-reorient" class="arcade-btn px-3 py-1.5 text-[10px] sm:text-xs font-bold bg-indigo-950/90">🎯 RECENTER</button>
+                    <button id="btn-options" class="arcade-btn px-3 py-1.5 text-[10px] sm:text-xs font-bold">⚙️ SETTINGS</button>
+                </div>
+
+                <!-- Bottom Controller Deck -->
+                <div class="flex justify-between items-end w-full gap-4 pointer-events-auto pb-2">
+                    <!-- Analogue Touch Joystick Pad -->
+                    <div id="analogue-zone" class="analogue-container">
+                        <div id="analogue-knob" class="analogue-stick"></div>
+                    </div>
+
+                    <!-- Combat Action Buttons -->
+                    <div class="flex flex-col gap-2">
+                        <div class="grid grid-cols-3 gap-2 w-56 sm:w-64 h-28 sm:h-32">
+                            <button id="btn-punch" class="arcade-btn text-xs sm:text-sm font-bold bg-blue-950/90">PUNCH<br><span class="text-[9px] text-cyan-300">[F]</span></button>
+                            <button id="btn-kick" class="arcade-btn arcade-btn-red text-xs sm:text-sm font-bold bg-rose-950/90">KICK<br><span class="text-[9px] text-rose-300">[G]</span></button>
+                            <button id="btn-special" class="arcade-btn arcade-btn-amber text-xs sm:text-sm font-bold bg-amber-950/90">SPECIAL<br><span class="text-[9px] text-amber-300">[H]</span></button>
+                        </div>
+                        <button id="btn-jump" class="arcade-btn py-3 text-xs sm:text-sm font-bold bg-cyan-950/90 w-full tracking-wider">JUMP [SPACE]</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start / Rematch Menu Modal -->
+            <div id="menu-modal" class="absolute inset-0 bg-black/92 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30">
+                <h1 class="text-3xl sm:text-6xl font-black orbitron mb-2 bg-gradient-to-r from-red-500 via-yellow-400 to-cyan-400 bg-clip-text text-transparent tracking-widest drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]">STREET STRIKER 3D</h1>
+                <p class="text-xs sm:text-sm text-cyan-300 mb-6 max-w-lg leading-relaxed">
+                    High-Octane 1v1 Combat Engine featuring Three.js 3D rendering, procedural high-res vector graphics textures, dynamic particle shockwaves, and analogue touch controls.
+                </p>
+                <div class="flex gap-4 justify-center">
+                    <button id="btn-start" class="arcade-btn px-8 py-4 text-sm sm:text-base font-black orbitron bg-gradient-to-r from-red-600 to-rose-700 text-white border-red-400 shadow-[0_0_25px_rgba(255,34,68,0.5)] cursor-pointer">FIGHT!</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Footer Info -->
+        <div class="px-4 py-2 bg-gradient-to-r from-blue-950/90 via-black/90 to-indigo-950/90 border-t-2 border-cyan-500/60 rounded-b-xl flex flex-wrap justify-between items-center text-[10px] sm:text-xs text-cyan-300 z-10 shadow-lg">
+            <span class="orbitron">🎮 Move: Joystick / WASD | Jump: Space | Punch: F | Kick: G | Special: H</span>
+            <span class="text-yellow-400 font-bold orbitron">Z.ITT DOS 5.0 COMBAT ENGINE</span>
+        </div>
+    </div>
+
+    <script>
+        // --- HIGH-RESOLUTION PROCEDURAL VECTOR TEXTURE GENERATOR ---
+        const TextureGenerator = {
+            createGridTexture: function(width = 1024, height = 1024) {
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                
+                // Deep Cyber Metallic Arena Floor Base
+                ctx.fillStyle = '#060810';
+                ctx.fillRect(0, 0, width, height);
+
+                // High-Detail Vector Grid Lines
+                ctx.strokeStyle = '#102238';
+                ctx.lineWidth = 6;
+                const step = 64;
+                for (let x = 0; x <= width; x += step) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+                }
+                for (let y = 0; y <= height; y += step) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+                }
+
+                // Inner Circuit Nodes & Accents
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 12;
+                ctx.strokeRect(16, 16, width - 32, height - 32);
+
+                ctx.strokeStyle = '#ff0055';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(width / 2, height / 2, 220, 0, Math.PI * 2);
+                ctx.stroke();
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                return texture;
+            },
+
+            createFighterSkin: function(primaryColor, accentColor) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                // Armor Base Fill
+                ctx.fillStyle = primaryColor;
+                ctx.fillRect(0, 0, 512, 512);
+
+                // Accent Armor Plates & Vector Panels
+                ctx.fillStyle = accentColor;
+                ctx.fillRect(0, 0, 512, 72);
+                ctx.fillRect(0, 240, 512, 40);
+                ctx.fillRect(64, 72, 128, 128);
+                ctx.fillRect(320, 72, 128, 128);
+
+                // High-Tech Circuit Lines
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.moveTo(64, 290); ctx.lineTo(448, 290);
+                ctx.moveTo(256, 72); ctx.lineTo(256, 480);
+                ctx.stroke();
+
+                // Vector Glow Particle Specks
+                ctx.fillStyle = '#ffffff';
+                for (let i = 0; i < 150; i++) {
+                    ctx.fillRect(Math.random() * 512, Math.random() * 512, 5, 5);
+                }
+
+                const texture = new THREE.CanvasTexture(canvas);
+                return texture;
+            }
+        };
+
+        // --- WEB AUDIO SYNTHESIS ENGINE ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+            playHit(isHeavy = false) {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = isHeavy ? 'triangle' : 'square';
+                const freq = isHeavy ? 80 : 160;
+                osc.frequency.setValueAtTime(freq, t);
+                osc.frequency.exponentialRampToValueAtTime(15, t + 0.2);
+                gain.gain.setValueAtTime(0.6, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.2);
+            }
+            playSpecial() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, t);
+                osc.frequency.linearRampToValueAtTime(700, t + 0.45);
+                gain.gain.setValueAtTime(0.5, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.45);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.45);
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        // --- GAME CONSTANTS & GLOBALS ---
+        const STAGE_WIDTH = 24;
+        const STAGE_DEPTH = 12;
+        const GRAVITY = -40;
+
+        let scene, camera, renderer;
+        let p1, p2;
+        let clock = new THREE.Clock();
+        let gameActive = false;
+        let matchTimer = 99;
+        let timerInterval = null;
+        let particles = [];
+        const keys = {};
+        const analogue = { x: 0, y: 0, active: false };
+
+        // --- FIGHTER CLASS ---
+        class Fighter {
+            constructor(id, color, accentColor, startX, isCPU = false) {
+                this.id = id;
+                this.isCPU = isCPU;
+                this.hp = 100;
+                this.energy = 0;
+                this.combo = 0;
+                this.comboTimer = 0;
+
+                this.velocity = new THREE.Vector3();
+                this.isGrounded = true;
+                this.isAttacking = false;
+                this.isHit = false;
+                this.attackType = null;
+                this.attackFrame = 0;
+                this.hitCooldown = 0;
+
+                // Build Hierarchical 3D Mesh with Vector Textures
+                this.mesh = new THREE.Group();
+                const texture = TextureGenerator.createFighterSkin(color, accentColor);
+                const mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.25, metalness: 0.6 });
+
+                // Torso
+                const torsoGeo = new THREE.BoxGeometry(1.2, 1.6, 0.8);
+                this.torso = new THREE.Mesh(torsoGeo, mat);
+                this.torso.position.y = 2.4;
+                this.torso.castShadow = true;
+                this.mesh.add(this.torso);
+
+                // Head
+                const headGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+                const headMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.2 });
+                this.head = new THREE.Mesh(headGeo, headMat);
+                this.head.position.set(0, 1.2, 0);
+                this.head.castShadow = true;
+                this.torso.add(this.head);
+
+                // Limbs
+                const limbMat = new THREE.MeshStandardMaterial({ color: 0x111218, roughness: 0.4, metalness: 0.5 });
+                const armGeo = new THREE.BoxGeometry(0.4, 1.2, 0.4);
+                
+                this.rArm = new THREE.Mesh(armGeo, mat);
+                this.rArm.position.set(-0.9, 0.2, 0);
+                this.torso.add(this.rArm);
+
+                this.lArm = new THREE.Mesh(armGeo, mat);
+                this.lArm.position.set(0.9, 0.2, 0);
+                this.torso.add(this.lArm);
+
+                const legGeo = new THREE.BoxGeometry(0.5, 1.4, 0.5);
+                this.rLeg = new THREE.Mesh(legGeo, limbMat);
+                this.rLeg.position.set(-0.4, -1.4, 0);
+                this.torso.add(this.rLeg);
+
+                this.lLeg = new THREE.Mesh(legGeo, limbMat);
+                this.lLeg.position.set(0.4, -1.4, 0);
+                this.torso.add(this.lLeg);
+
+                this.mesh.position.set(startX, 0, 0);
+                scene.add(this.mesh);
+            }
+
+            update(dt, opponent) {
+                if (this.hitCooldown > 0) this.hitCooldown -= dt;
+                if (this.comboTimer > 0) {
+                    this.comboTimer -= dt;
+                    if (this.comboTimer <= 0) {
+                        this.combo = 0;
+                        this.updateComboUI();
+                    }
+                }
+
+                // Physics & Gravity
+                this.velocity.y += GRAVITY * dt;
+                this.mesh.position.addScaledVector(this.velocity, dt);
+
+                // Floor Collision
+                if (this.mesh.position.y <= 0) {
+                    this.mesh.position.y = 0;
+                    this.velocity.y = 0;
+                    this.isGrounded = true;
+                }
+
+                // Stage Boundaries
+                this.mesh.position.x = THREE.MathUtils.clamp(this.mesh.position.x, -STAGE_WIDTH/2 + 1, STAGE_WIDTH/2 - 1);
+                this.mesh.position.z = THREE.MathUtils.clamp(this.mesh.position.z, -STAGE_DEPTH/2 + 1, STAGE_DEPTH/2 - 1);
+
+                // Face Opponent
+                if (!this.isAttacking && !this.isHit) {
+                    const dir = opponent.mesh.position.x - this.mesh.position.x;
+                    this.mesh.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+                }
+
+                this.animate(dt);
+
+                if (this.isCPU && gameActive) {
+                    this.updateAI(opponent);
+                }
+            }
+
+            animate(dt) {
+                const time = clock.getElapsedTime() * 14;
+
+                if (this.isHit) {
+                    this.torso.rotation.x = -0.4;
+                    this.torso.rotation.z = 0.2;
+                    return;
+                }
+
+                if (this.isAttacking) {
+                    this.attackFrame += dt * 20;
+                    if (this.attackType === 'punch') {
+                        this.rArm.rotation.x = -Math.PI / 2;
+                        this.rArm.position.z = Math.sin(this.attackFrame) * 1.0;
+                        if (this.attackFrame > Math.PI) this.endAttack();
+                    } else if (this.attackType === 'kick') {
+                        this.rLeg.rotation.x = -Math.PI / 1.6;
+                        this.rLeg.position.z = Math.sin(this.attackFrame) * 1.4;
+                        if (this.attackFrame > Math.PI) this.endAttack();
+                    } else if (this.attackType === 'special') {
+                        this.torso.rotation.y = Math.sin(this.attackFrame * 2.5) * 0.7;
+                        if (this.attackFrame > Math.PI * 1.5) this.endAttack();
+                    }
+                } else {
+                    this.torso.rotation.set(0, 0, 0);
+                    this.rArm.position.set(-0.9, 0.2, 0);
+                    this.lArm.position.set(0.9, 0.2, 0);
+                    this.rLeg.position.set(-0.4, -1.4, 0);
+                    this.lLeg.position.set(0.4, -1.4, 0);
+
+                    if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.z) > 0.1) {
+                        this.rLeg.rotation.x = Math.sin(time) * 0.7;
+                        this.lLeg.rotation.x = -Math.sin(time) * 0.7;
+                    }
+                }
+            }
+
+            attack(type, opponent) {
+                if (this.isAttacking || this.isHit || !this.isGrounded) return;
+
+                this.isAttacking = true;
+                this.attackType = type;
+                this.attackFrame = 0;
+
+                let range = 2.5;
+                let damage = 12;
+                let isHeavy = false;
+
+                if (type === 'kick') {
+                    damage = 20;
+                    range = 3.0;
+                    isHeavy = true;
+                } else if (type === 'special') {
+                    if (this.energy < 50) {
+                        this.endAttack();
+                        return;
+                    }
+                    this.energy -= 50;
+                    this.updateEnergyUI();
+                    damage = 38;
+                    range = 4.8;
+                    isHeavy = true;
+                    audio.playSpecial();
+                    spawnSpecialFX(this.mesh.position, this.mesh.rotation.y);
+                }
+
+                audio.playHit(isHeavy);
+
+                const dist = this.mesh.position.distanceTo(opponent.mesh.position);
+                if (dist <= range) {
+                    opponent.takeDamage(damage, this);
+                    spawnImpactFX(opponent.mesh.position.clone().add(new THREE.Vector3(0, 2, 0)));
+                    this.energy = Math.min(100, this.energy + 20);
+                    this.updateEnergyUI();
+                }
+            }
+
+            endAttack() {
+                this.isAttacking = false;
+                this.attackType = null;
+                this.rArm.rotation.set(0, 0, 0);
+                this.rLeg.rotation.set(0, 0, 0);
+            }
+
+            takeDamage(amount, attacker) {
+                if (this.hitCooldown > 0) return;
+
+                this.hp = Math.max(0, this.hp - amount);
+                this.isHit = true;
+                this.hitCooldown = 0.3;
+
+                const pushDir = this.mesh.position.x > attacker.mesh.position.x ? 1 : -1;
+                this.velocity.x = pushDir * (amount * 0.4);
+                this.velocity.y = amount * 0.2;
+
+                attacker.combo++;
+                attacker.comboTimer = 2.0;
+                attacker.updateComboUI();
+
+                this.updateHealthUI();
+
+                setTimeout(() => { this.isHit = false; }, 300);
+
+                if (this.hp <= 0) {
+                    endMatch(attacker.id === 'p1' ? 'PLAYER 1 WINS!' : 'CPU ARENA BOT WINS!');
+                }
+            }
+
+            updateAI(opponent) {
+                const dist = this.mesh.position.distanceTo(opponent.mesh.position);
+                if (dist > 3.5) {
+                    this.velocity.x = (opponent.mesh.position.x > this.mesh.position.x ? 1 : -1) * 7;
+                } else if (dist < 1.6) {
+                    this.velocity.x = (opponent.mesh.position.x > this.mesh.position.x ? -1 : 1) * 6;
+                } else {
+                    this.velocity.x = 0;
+                }
+
+                if (dist < 3.5 && Math.random() < 0.06) {
+                    const moves = ['punch', 'kick'];
+                    if (this.energy >= 50) moves.push('special');
+                    this.attack(moves[Math.floor(Math.random() * moves.length)], opponent);
+                }
+            }
+
+            updateHealthUI() {
+                document.getElementById(`${this.id}-health`).style.width = `${this.hp}%`;
+                document.getElementById(`${this.id}-hp-text`).innerText = `${Math.ceil(this.hp)}%`;
+            }
+
+            updateEnergyUI() {
+                document.getElementById(`${this.id}-energy`).style.width = `${this.energy}%`;
+            }
+
+            updateComboUI() {
+                const elem = document.getElementById(`${this.id}-combo`);
+                if (this.combo > 1) {
+                    elem.innerText = `${this.combo} HITS!`;
+                    elem.style.opacity = '1';
+                } else {
+                    elem.style.opacity = '0';
+                }
+            }
+        }
+
+        // --- PARTICLE SHOCKWAVE & IMPACT SYSTEMS ---
+        function spawnImpactFX(pos) {
+            const count = 25;
+            const geom = new THREE.BufferGeometry();
+            const positions = [], vels = [];
+            for (let i = 0; i < count; i++) {
+                positions.push(pos.x, pos.y, pos.z);
+                vels.push((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16);
+            }
+            geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            const mat = new THREE.PointsMaterial({ color: 0x00ffff, size: 0.5, transparent: true, opacity: 1 });
+            const ps = new THREE.Points(geom, mat);
+            scene.add(ps);
+            particles.push({ mesh: ps, vels, life: 0.35 });
+        }
+
+        function spawnSpecialFX(pos, rotY) {
+            const geom = new THREE.SphereGeometry(1.5, 16, 16);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xff0066, wireframe: true });
+            const sph = new THREE.Mesh(geom, mat);
+            sph.position.copy(pos);
+            sph.position.y += 2.0;
+            scene.add(sph);
+
+            const dir = Math.sin(rotY);
+            let dist = 0;
+            const iv = setInterval(() => {
+                sph.position.x += dir * 1.0;
+                sph.scale.multiplyScalar(1.08);
+                dist += 1.0;
+                if (dist > 15) {
+                    scene.remove(sph);
+                    clearInterval(iv);
+                }
+            }, 20);
+        }
+
+        // --- SCENE INITIALIZATION ---
+        function initScene() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x05050b, 0.012);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 4.5, 19);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(12, 26, 18);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            // Floor Stage with High-Res Procedural Vector Texture
+            const floorGeo = new THREE.BoxGeometry(STAGE_WIDTH + 4, 1, STAGE_DEPTH + 4);
+            const floorMat = new THREE.MeshStandardMaterial({
+                map: TextureGenerator.createGridTexture(1024, 1024),
+                roughness: 0.15,
+                metalness: 0.9
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.position.y = -0.5;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // --- INPUT & ANALOGUE TOUCH JOYSTICK CONTROLS ---
+        function setupAnalogueJoystick() {
+            const zone = document.getElementById('analogue-zone');
+            const knob = document.getElementById('analogue-knob');
+            const maxRadius = 40;
+
+            const handleTouch = (clientX, clientY) => {
+                const rect = zone.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                let dx = clientX - centerX;
+                let dy = clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+                if (dist > maxRadius) {
+                    dx = (dx / dist) * maxRadius;
+                    dy = (dy / dist) * maxRadius;
+                }
+                knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                analogue.x = dx / maxRadius;
+                analogue.y = dy / maxRadius;
+                analogue.active = true;
+            };
+
+            const resetStick = () => {
+                knob.style.transform = `translate(-50%, -50%)`;
+                analogue.x = 0;
+                analogue.y = 0;
+                analogue.active = false;
+            };
+
+            zone.addEventListener('touchstart', e => { e.preventDefault(); handleTouch(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+            zone.addEventListener('touchmove', e => { e.preventDefault(); handleTouch(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+            zone.addEventListener('touchend', e => { e.preventDefault(); resetStick(); }, {passive: false});
+
+            zone.addEventListener('mousedown', e => {
+                const moveHandler = ev => handleTouch(ev.clientX, ev.clientY);
+                const upHandler = () => {
+                    resetStick();
+                    window.removeEventListener('mousemove', moveHandler);
+                    window.removeEventListener('mouseup', upHandler);
+                };
+                handleTouch(e.clientX, e.clientY);
+                window.addEventListener('mousemove', moveHandler);
+                window.addEventListener('mouseup', upHandler);
+            });
+        }
+
+        function handlePlayerInput() {
+            if (!p1 || !gameActive || p1.isHit) return;
+            const speed = 8.5;
+            p1.velocity.x = 0;
+            p1.velocity.z = 0;
+
+            if (keys['KeyA']) p1.velocity.x = -speed;
+            if (keys['KeyD']) p1.velocity.x = speed;
+            if (keys['KeyW']) p1.velocity.z = -speed * 0.65;
+            if (keys['KeyS']) p1.velocity.z = speed * 0.65;
+
+            if (analogue.active) {
+                p1.velocity.x = analogue.x * speed;
+                p1.velocity.z = analogue.y * speed * 0.65;
+            }
+
+            if (keys['Space'] && p1.isGrounded) {
+                p1.velocity.y = 15;
+                p1.isGrounded = false;
+            }
+
+            if (keys['KeyF']) p1.attack('punch', p2);
+            if (keys['KeyG']) p1.attack('kick', p2);
+            if (keys['KeyH']) p1.attack('special', p2);
+        }
+
+        // --- CAMERA FOLLOW & DYNAMICS ---
+        function updateCamera() {
+            if (!p1 || !p2) return;
+            const midpoint = new THREE.Vector3().addVectors(p1.mesh.position, p2.mesh.position).multiplyScalar(0.5);
+            const dist = p1.mesh.position.distanceTo(p2.mesh.position);
+            const targetPos = new THREE.Vector3(midpoint.x, Math.max(3.8, midpoint.y + 3.0), Math.max(13, dist * 1.15 + 5));
+            camera.position.lerp(targetPos, 0.1);
+            camera.lookAt(midpoint.x, midpoint.y + 1.3, midpoint.z);
+        }
+
+        // --- MATCH FLOW CONTROLLER ---
+        function startMatch() {
+            document.getElementById('menu-modal').style.display = 'none';
+            audio.init();
+
+            if (p1) scene.remove(p1.mesh);
+            if (p2) scene.remove(p2.mesh);
+
+            p1 = new Fighter('p1', '#e62e2e', '#ffaa00', -5, false);
+            p2 = new Fighter('p2', '#2e6ee6', '#00ffff', 5, true);
+
+            matchTimer = 99;
+            document.getElementById('hud-timer').innerText = matchTimer;
+
+            const announcer = document.getElementById('announcer');
+            announcer.innerText = 'ROUND 1 • FIGHT!';
+            announcer.style.opacity = '1';
+            gameActive = true;
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                matchTimer--;
+                document.getElementById('hud-timer').innerText = matchTimer;
+                if (matchTimer <= 0) endMatch('TIME OVER - DRAW!');
+            }, 1000);
+
+            setTimeout(() => { announcer.style.opacity = '0'; }, 1500);
+        }
+
+        function endMatch(msg) {
+            gameActive = false;
+            clearInterval(timerInterval);
+            const announcer = document.getElementById('announcer');
+            announcer.innerText = msg;
+            announcer.style.opacity = '1';
+
+            setTimeout(() => {
+                announcer.style.opacity = '0';
+                document.getElementById('menu-modal').style.display = 'flex';
+                document.getElementById('btn-start').innerText = 'REMATCH';
+            }, 3000);
+        }
+
+        // --- MAIN RENDER & GAME LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1);
+
+            if (gameActive) {
+                handlePlayerInput();
+                p1.update(dt, p2);
+                p2.update(dt, p1);
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const ps = particles[i];
+                    ps.life -= dt;
+                    if (ps.life <= 0) {
+                        scene.remove(ps.mesh);
+                        particles.splice(i, 1);
+                        continue;
+                    }
+                    const pos = ps.mesh.geometry.attributes.position.array;
+                    for (let j = 0; j < ps.vels.length / 3; j++) {
+                        pos[j*3] += ps.vels[j*3] * dt;
+                        pos[j*3+1] += ps.vels[j*3+1] * dt;
+                        pos[j*3+2] += ps.vels[j*3+2] * dt;
+                    }
+                    ps.mesh.geometry.attributes.position.needsUpdate = true;
+                }
+            }
+
+            updateCamera();
+            renderer.render(scene, camera);
+        }
+
+        // --- EVENT LISTENERS ---
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        document.getElementById('btn-start').addEventListener('click', startMatch);
+        document.getElementById('btn-reorient').addEventListener('click', () => {
+            if (p1) p1.mesh.position.set(-5, 0, 0);
+            if (p2) p2.mesh.position.set(5, 0, 0);
+        });
+        document.getElementById('btn-options').addEventListener('click', () => {
+            gameActive = false;
+            document.getElementById('menu-modal').style.display = 'flex';
+        });
+
+        document.getElementById('btn-jump').addEventListener('touchstart', e => { e.preventDefault(); keys['Space'] = true; }, {passive: false});
+        document.getElementById('btn-jump').addEventListener('touchend', e => { e.preventDefault(); keys['Space'] = false; }, {passive: false});
+        
+        document.getElementById('btn-punch').addEventListener('touchstart', e => { e.preventDefault(); if(p1) p1.attack('punch', p2); }, {passive: false});
+        document.getElementById('btn-kick').addEventListener('touchstart', e => { e.preventDefault(); if(p1) p1.attack('kick', p2); }, {passive: false});
+        document.getElementById('btn-special').addEventListener('touchstart', e => { e.preventDefault(); if(p1) p1.attack('special', p2); }, {passive: false});
+
+        window.onload = () => {
+            initScene();
+            setupAnalogueJoystick();
+            animate();
+        };
+    </script>
+</body>
+</html>
