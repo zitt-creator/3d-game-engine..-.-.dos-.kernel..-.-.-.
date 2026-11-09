@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D to 3D Vector Model Test</title>
+    <!-- Tailwind CSS for UI overlays -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #05050a;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .neon-glow {
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.8), 0 0 20px rgba(0, 243, 255, 0.5), 0 0 30px rgba(0, 243, 255, 0.3);
+        }
+        .neon-glow-p2 {
+            text-shadow: 0 0 10px rgba(255, 0, 85, 0.8), 0 0 20px rgba(255, 0, 85, 0.5), 0 0 30px rgba(255, 0, 85, 0.3);
+        }
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.3) 50%,
+                rgba(0, 0, 0, 0.3)
+            );
+            background-size: 100% 4px;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden">
+
+    <!-- CRT Scanline & Vignette Overlay -->
+    <div class="absolute inset-0 scanline pointer-events-none z-20"></div>
+    <div class="absolute inset-0 pointer-events-none z-20 shadow-[inset_0_0_100px_rgba(0,0,0,0.9)]"></div>
+
+    <!-- HUD UI Container -->
+    <div id="hud" class="absolute inset-0 z-30 flex flex-col justify-between p-6 pointer-events-none">
+        <!-- Top Bar: Health, Meters, Timer -->
+        <div class="flex justify-between items-start w-full max-w-7xl mx-auto">
+            <!-- Player 1 HUD -->
+            <div class="flex flex-col w-5/12">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-cyan-400 font-black text-xl neon-glow">P1 // CYBER-NINJA</span>
+                    <span id="p1-rounds" class="text-cyan-300 text-lg tracking-widest">👑 👑</span>
+                </div>
+                <!-- Health Bar Frame -->
+                <div class="h-6 w-full bg-gray-900 border-2 border-cyan-500 rounded p-0.5 overflow-hidden shadow-[0_0_15px_rgba(0,243,255,0.4)]">
+                    <div id="p1-health" class="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-100 rounded-sm w-full"></div>
+                </div>
+                <!-- Special Meter -->
+                <div class="flex items-center mt-1.5 space-x-2">
+                    <span class="text-xs text-cyan-300 font-bold">SPEC</span>
+                    <div class="h-2.5 flex-1 bg-gray-900 border border-cyan-600 rounded overflow-hidden">
+                        <div id="p1-special" class="h-full bg-cyan-300 transition-all duration-100 w-0 shadow-[0_0_8px_#00f3ff]"></div>
+                    </div>
+                </div>
+                <div id="p1-combo" class="text-cyan-400 font-black text-lg mt-1 italic h-6"></div>
+            </div>
+
+            <!-- Central Timer / Round Info -->
+            <div class="flex flex-col items-center justify-center pt-2">
+                <div id="timer" class="text-5xl font-black text-yellow-400 tracking-wider drop-shadow-[0_0_15px_rgba(250,204,21,0.8)]">99</div>
+                <div id="round-indicator" class="text-xs text-gray-400 font-bold tracking-widest mt-1">ROUND 1</div>
+            </div>
+
+            <!-- Player 2 HUD -->
+            <div class="flex flex-col w-5/12 items-end">
+                <div class="flex justify-between items-center mb-1 w-full flex-row-reverse">
+                    <span class="text-rose-500 font-black text-xl neon-glow-p2">P2 // MECHA-RONIN</span>
+                    <span id="p2-rounds" class="text-rose-400 text-lg tracking-widest">👑 👑</span>
+                </div>
+                <!-- Health Bar Frame -->
+                <div class="h-6 w-full bg-gray-900 border-2 border-rose-500 rounded p-0.5 overflow-hidden shadow-[0_0_15px_rgba(255,0,85,0.4)] flex justify-end">
+                    <div id="p2-health" class="h-full bg-gradient-to-l from-rose-600 to-rose-400 transition-all duration-100 rounded-sm w-full"></div>
+                </div>
+                <!-- Special Meter -->
+                <div class="flex items-center mt-1.5 space-x-2 w-full flex-row-reverse space-x-reverse">
+                    <span class="text-xs text-rose-300 font-bold">SPEC</span>
+                    <div class="h-2.5 flex-1 bg-gray-900 border border-rose-600 rounded overflow-hidden">
+                        <div id="p2-special" class="h-full bg-rose-400 transition-all duration-100 w-0 shadow-[0_0_8px_#ff0055]"></div>
+                    </div>
+                </div>
+                <div id="p2-combo" class="text-rose-500 font-black text-lg mt-1 italic h-6"></div>
+            </div>
+        </div>
+
+        <!-- Center Announcer Text Overlay -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div id="announcer" class="text-6xl md:text-8xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-white to-yellow-400 drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] opacity-0 transition-opacity duration-300">
+                READY
+            </div>
+        </div>
+
+        <!-- Bottom Controls Guide -->
+        <div class="flex justify-between items-end w-full max-w-7xl mx-auto opacity-70 text-xs text-cyan-300 bg-black/60 p-3 rounded-xl border border-cyan-500/30">
+            <div>
+                <strong class="text-white">P1 CONTROLS:</strong> Move: <span class="text-yellow-300">W A S D</span> | Punch: <span class="text-yellow-300">F</span> | Kick: <span class="text-yellow-300">G</span> | Special: <span class="text-yellow-300">H</span>
+            </div>
+            <div>
+                <strong class="text-white">P2 CONTROLS:</strong> Move: <span class="text-rose-400">ARROWS</span> | Punch: <span class="text-rose-400">J</span> | Kick: <span class="text-rose-400">K</span> | Special: <span class="text-rose-400">L</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over / Victory Modal -->
+    <div id="game-over-modal" class="absolute inset-0 z-40 bg-black/80 backdrop-blur-md hidden flex flex-col items-center justify-center">
+        <h2 id="victory-title" class="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-rose-500 mb-4 neon-glow text-center">PLAYER 1 WINS</h2>
+        <p id="victory-subtitle" class="text-xl text-gray-300 mb-8 tracking-widest">ABSOLUTE DOMINATION</p>
+        <button id="restart-btn" class="pointer-events-auto px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xl rounded-xl shadow-[0_0_25px_rgba(0,243,255,0.6)] transition-all transform hover:scale-105 active:scale-95">
+            FIGHT AGAIN
+        </button>
+    </div>
+
+    <!-- Main Game Script -->
+    <script>
+        // --- GAME CONFIG & STATE ---
+        const GAME_CONFIG = {
+            maxHealth: 100,
+            maxSpecial: 100,
+            roundTime: 99,
+            gravity: 0.6,
+            groundY: 0
+        };
+
+        let gameState = {
+            status: 'STARTING', // STARTING, FIGHTING, ROUND_OVER, GAME_OVER
+            round: 1,
+            p1RoundsWon: 0,
+            p2RoundsWon: 0,
+            timeLeft: GAME_CONFIG.roundTime,
+            timerInterval: null
+        };
+
+        // --- THREE.JS SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x05050a, 0.025);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 4, 14);
+        camera.lookAt(0, 1.5, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0x222244, 1.5);
+        scene.add(ambientLight);
+
+        const p1Light = new THREE.PointLight(0x00f3ff, 3, 15);
+        p1Light.position.set(-3, 4, 2);
+        scene.add(p1Light);
+
+        const p2Light = new THREE.PointLight(0xff0055, 3, 15);
+        p2Light.position.set(3, 4, 2);
+        scene.add(p2Light);
+
+        // --- RETRO ARCADE ENVIRONMENT (GRID FLOOR & NEON RINGS) ---
+        const gridHelper = new THREE.GridHelper(50, 50, 0x00f3ff, 0x1f1f3f);
+        gridHelper.position.y = 0;
+        scene.add(gridHelper);
+
+        // Cyberpunk background grid elements / wireframe pillars
+        const arenaGroup = new THREE.Group();
+        const pillarGeo = new THREE.BoxGeometry(1, 12, 1);
+        const pillarMat = new THREE.MeshBasicMaterial({ color: 0x111122, wireframe: true });
+        
+        for(let i = -20; i <= 20; i += 10) {
+            if(i === 0) continue;
+            const pL = new THREE.Mesh(pillarGeo, pillarMat);
+            pL.position.set(i, 6, -10);
+            arenaGroup.add(pL);
+
+            const pR = new THREE.Mesh(pillarGeo, pillarMat);
+            pR.position.set(i, 6, 10);
+            arenaGroup.add(pR);
+        }
+        scene.add(arenaGroup);
+
+        // --- VECTOR FIGHTER BUILDER ---
+        // Generates stylized robotic/cybernetic warrior meshes using wireframes and glowing materials
+        function createFighterMesh(primaryColor, secondaryColor) {
+            const group = new THREE.Group();
+
+            const matWire = new THREE.MeshBasicMaterial({ color: primaryColor, wireframe: true });
+            const matGlow = new THREE.MeshStandardMaterial({ color: primaryColor, emissive: primaryColor, emissiveIntensity: 0.8 });
+            const matSec = new THREE.MeshBasicMaterial({ color: secondaryColor, wireframe: true });
+
+            // Torso
+            const torsoGeo = new THREE.BoxGeometry(1.2, 1.6, 0.7);
+            const torso = new THREE.Mesh(torsoGeo, matWire);
+            torso.position.y = 2.1;
+            torso.castShadow = true;
+            group.add(torso);
+
+            // Head
+            const headGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+            const head = new THREE.Mesh(headGeo, matGlow);
+            head.position.y = 3.2;
+            group.add(head);
+
+            // Limbs pivots for animation
+            const hips = new THREE.Group();
+            hips.position.y = 1.2;
+            group.add(hips);
+
+            // Left Leg
+            const lLegGroup = new THREE.Group();
+            lLegGroup.position.set(-0.35, 0, 0);
+            const legGeo = new THREE.BoxGeometry(0.4, 1.3, 0.4);
+            const lLeg = new THREE.Mesh(legGeo, matSec);
+            lLeg.position.y = -0.65;
+            lLegGroup.add(lLeg);
+            hips.add(lLegGroup);
+
+            // Right Leg
+            const rLegGroup = new THREE.Group();
+            rLegGroup.position.set(0.35, 0, 0);
+            const rLeg = new THREE.Mesh(legGeo, matSec);
+            rLeg.position.y = -0.65;
+            rLegGroup.add(rLeg);
+            hips.add(rLegGroup);
+
+            // Shoulders & Arms pivot
+            const shoulders = new THREE.Group();
+            shoulders.position.y = 2.7;
+            group.add(shoulders);
+
+            // Left Arm
+            const lArmGroup = new THREE.Group();
+            lArmGroup.position.set(-0.8, 0, 0);
+            const armGeo = new THREE.BoxGeometry(0.35, 1.2, 0.35);
+            const lArm = new THREE.Mesh(armGeo, matSec);
+            lArm.position.y = -0.6;
+            lArmGroup.add(lArm);
+            shoulders.add(lArmGroup);
+
+            // Right Arm
+            const rArmGroup = new THREE.Group();
+            rArmGroup.position.set(0.8, 0, 0);
+            const rArm = new THREE.Mesh(armGeo, matSec);
+            rArm.position.y = -0.6;
+            rArmGroup.add(rArm);
+            shoulders.add(rArmGroup);
+
+            return {
+                mesh: group,
+                parts: { torso, head, lLegGroup, rLegGroup, lArmGroup, rArmGroup }
+            };
+        }
+
+        // --- FIGHTER OBJECT CLASS ---
+        class Fighter {
+            constructor(id, x, color1, color2, facingRight) {
+                this.id = id;
+                this.x = x;
+                this.y = 0;
+                this.z = 0;
+                this.vx = 0;
+                this.vy = 0;
+                this.facing = facingRight ? 1 : -1;
+                
+                this.health = GAME_CONFIG.maxHealth;
+                this.special = 0;
+                this.roundsWon = 0;
+
+                this.isGrounded = true;
+                this.isJumping = false;
+                this.isBlocking = false;
+                this.isAttacking = false;
+                this.attackCooldown = 0;
+                this.hitStun = 0;
+                this.animTimer = 0;
+
+                this.combo = 0;
+                this.comboTimer = 0;
+
+                this.visuals = createFighterMesh(color1, color2);
+                scene.add(this.visuals.mesh);
+            }
+
+            update(opponent) {
+                if (gameState.status !== 'FIGHTING') return;
+
+                // Handle Hit Stun
+                if (this.hitStun > 0) {
+                    this.hitStun--;
+                    this.visuals.mesh.position.set(this.x + (Math.random() - 0.5) * 0.2, this.y, this.z);
+                    return;
+                }
+
+                // Gravity & Movement
+                this.vy -= GAME_CONFIG.gravity;
+                this.y += this.vy;
+                if (this.y <= GAME_CONFIG.groundY) {
+                    this.y = GAME_CONFIG.groundY;
+                    this.vy = 0;
+                    this.isGrounded = true;
+                    this.isJumping = false;
+                }
+
+                this.x += this.vx;
+                // Boundary clamping
+                this.x = Math.max(-7, Math.min(7, this.x));
+
+                // Auto face opponent
+                if (this.x < opponent.x) {
+                    this.facing = 1;
+                    this.visuals.mesh.rotation.y = Math.PI / 2;
+                } else {
+                    this.facing = -1;
+                    this.visuals.mesh.rotation.y = -Math.PI / 2;
+                }
+
+                // Cooldowns
+                if (this.attackCooldown > 0) this.attackCooldown--;
+                if (this.comboTimer > 0) {
+                    this.comboTimer--;
+                    if (this.comboTimer === 0) {
+                        this.combo = 0;
+                        updateComboDisplay(this.id, 0);
+                    }
+                }
+
+                // Animations (Idle / Walking / Attack)
+                this.animTimer += 0.15;
+                const p = this.visuals.parts;
+
+                if (!this.isGrounded) {
+                    // Jump pose
+                    p.lLegGroup.rotation.x = 0.5;
+                    p.rLegGroup.rotation.x = -0.5;
+                    p.lArmGroup.rotation.x = -1.0;
+                    p.rArmGroup.rotation.x = -1.0;
+                } else if (Math.abs(this.vx) > 0) {
+                    // Walk cycle
+                    p.lLegGroup.rotation.x = Math.sin(this.animTimer * 2) * 0.6;
+                    p.rLegGroup.rotation.x = -Math.sin(this.animTimer * 2) * 0.6;
+                    p.lArmGroup.rotation.x = -Math.sin(this.animTimer * 2) * 0.4;
+                    p.rArmGroup.rotation.x = Math.sin(this.animTimer * 2) * 0.4;
+                } else if (!this.isAttacking) {
+                    // Idle breathing
+                    p.lLegGroup.rotation.x = 0;
+                    p.rLegGroup.rotation.x = 0;
+                    p.lArmGroup.rotation.x = Math.sin(this.animTimer) * 0.1;
+                    p.rArmGroup.rotation.x = -Math.sin(this.animTimer) * 0.1;
+                    p.torso.position.y = 2.1 + Math.sin(this.animTimer * 2) * 0.05;
+                }
+
+                this.visuals.mesh.position.set(this.x, this.y, this.z);
+            }
+
+            jump() {
+                if (this.isGrounded && this.hitStun === 0) {
+                    this.vy = 12;
+                    this.isGrounded = false;
+                    this.isJumping = true;
+                }
+            }
+
+            attack(type, opponent) {
+                if (this.attackCooldown > 0 || this.hitStun > 0) return;
+
+                this.isAttacking = true;
+                let damage = 10;
+                let range = 2.2;
+                let stunDuration = 12;
+
+                if (type === 'kick') {
+                    damage = 15;
+                    range = 2.5;
+                    stunDuration = 18;
+                    this.attackCooldown = 25;
+                    // Kick animation
+                    this.visuals.parts.rLegGroup.rotation.x = -1.5;
+                    setTimeout(() => { this.visuals.parts.rLegGroup.rotation.x = 0; this.isAttacking = false; }, 250);
+                } else if (type === 'punch') {
+                    damage = 8;
+                    range = 1.8;
+                    stunDuration = 10;
+                    this.attackCooldown = 15;
+                    // Punch animation
+                    this.visuals.parts.rArmGroup.rotation.x = -1.5;
+                    setTimeout(() => { this.visuals.parts.rArmGroup.rotation.x = 0; this.isAttacking = false; }, 150);
+                } else if (type === 'special') {
+                    if (this.special < 100) {
+                        this.isAttacking = false;
+                        return;
+                    }
+                    this.special = 0;
+                    updateSpecialDisplay(this.id, 0);
+                    damage = 35;
+                    range = 4.0;
+                    stunDuration = 35;
+                    this.attackCooldown = 50;
+                    
+                    // Special beam/blast effect
+                    createEnergyBlast(this.x, this.y + 2, this.z, this.facing);
+                    setTimeout(() => { this.isAttacking = false; }, 400);
+                }
+
+                // Check collision with opponent
+                const dist = Math.abs(this.x - opponent.x);
+                if (dist <= range && Math.abs(this.y - opponent.y) < 2.0) {
+                    opponent.takeDamage(damage, stunDuration, this);
+                    this.special = Math.min(100, this.special + 20);
+                    updateSpecialDisplay(this.id, this.special);
+
+                    // Combo increment
+                    this.combo++;
+                    this.comboTimer = 60;
+                    updateComboDisplay(this.id, this.combo);
+
+                    // Spawn hit spark
+                    spawnHitSparks((this.x + opponent.x) / 2, opponent.y + 2, 0);
+                }
+            }
+
+            takeDamage(amount, stun, attacker) {
+                if (this.isBlocking) {
+                    amount *= 0.3;
+                    stun *= 0.5;
+                }
+                this.health = Math.max(0, this.health - amount);
+                this.hitStun = stun;
+                updateHealthDisplay(this.id, this.health);
+
+                // Check KO
+                if (this.health <= 0) {
+                    handleRoundOver(attacker.id);
+                }
+            }
+
+            reset(startX) {
+                this.x = startX;
+                this.y = 0;
+                this.health = GAME_CONFIG.maxHealth;
+                this.hitStun = 0;
+                this.attackCooldown = 0;
+                this.combo = 0;
+                updateHealthDisplay(this.id, this.health);
+                updateComboDisplay(this.id, 0);
+            }
+        }
+
+        // Initialize Fighters (P1: Cyan Neon Ninja, P2: Rose Mecha-Ronin)
+        const p1 = new Fighter('p1', -3, 0x00f3ff, 0x0066aa, true);
+        const p2 = new Fighter('p2', 3, 0xff0055, 0x880033, false);
+
+        // --- PARTICLE / EFFECT SYSTEMS ---
+        const particles = [];
+
+        function spawnHitSparks(x, y, z) {
+            for (let i = 0; i < 15; i++) {
+                const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(x, y, z);
+                scene.add(mesh);
+
+                particles.push({
+                    mesh: mesh,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    vz: (Math.random() - 0.5) * 0.4,
+                    life: 20
+                });
+            }
+        }
+
+        function createEnergyBlast(x, y, z, direction) {
+            const geo = new THREE.SphereGeometry(0.8, 16, 16);
+            const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+            const blast = new THREE.Mesh(geo, mat);
+            blast.position.set(x + direction * 1.5, y, z);
+            scene.add(blast);
+
+            const travelInterval = setInterval(() => {
+                blast.position.x += direction * 0.6;
+                // Check collision with opponent
+                const target = direction > 0 ? p2 : p1;
+                if (Math.abs(blast.position.x - target.x) < 1.2 && Math.abs(blast.position.y - target.y) < 2.0) {
+                    target.takeDamage(30, 30, direction > 0 ? p1 : p2);
+                    spawnHitSparks(target.x, target.y + 2, 0);
+                    scene.remove(blast);
+                    clearInterval(travelInterval);
+                }
+            }, 20);
+
+            setTimeout(() => {
+                scene.remove(blast);
+                clearInterval(travelInterval);
+            }, 800);
+        }
+
+        // --- INPUT HANDLING ---
+        const keys = {};
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+
+            if (gameState.status === 'FIGHTING') {
+                // P1 Attacks
+                if (e.code === 'KeyF') p1.attack('punch', p2);
+                if (e.code === 'KeyG') p1.attack('kick', p2);
+                if (e.code === 'KeyH') p1.attack('special', p2);
+                if (e.code === 'KeyW') p1.jump();
+
+                // P2 Attacks
+                if (e.code === 'KeyJ') p2.attack('punch', p1);
+                if (e.code === 'KeyK') p2.attack('kick', p1);
+                if (e.code === 'KeyL') p2.attack('special', p1);
+                if (e.code === 'ArrowUp') p2.jump();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        function handleContinuousInput() {
+            if (gameState.status !== 'FIGHTING') return;
+
+            // Player 1 Movement (WASD + S for block)
+            p1.vx = 0;
+            p1.isBlocking = false;
+            if (keys['KeyA']) { p1.vx = -0.15; }
+            if (keys['KeyD']) { p1.vx = 0.15; }
+            if (keys['KeyS']) { p1.isBlocking = true; }
+
+            // Player 2 Movement (Arrows + Down for block)
+            p2.vx = 0;
+            p2.isBlocking = false;
+            if (keys['ArrowLeft']) { p2.vx = -0.15; }
+            if (keys['ArrowRight']) { p2.vx = 0.15; }
+            if (keys['ArrowDown']) { p2.isBlocking = true; }
+        }
+
+        // --- HUD UPDATE FUNCTIONS ---
+        function updateHealthDisplay(id, health) {
+            const bar = document.getElementById(`${id}-health`);
+            bar.style.width = `${Math.max(0, health)}%`;
+        }
+
+        function updateSpecialDisplay(id, special) {
+            const bar = document.getElementById(`${id}-special`);
+            bar.style.width = `${special}%`;
+        }
+
+        function updateComboDisplay(id, combo) {
+            const elem = document.getElementById(`${id}-combo`);
+            if (combo > 1) {
+                elem.innerText = `${combo} HIT COMBO!`;
+            } else {
+                elem.innerText = '';
+            }
+        }
+
+        function showAnnouncer(text, duration = 1500) {
+            const ann = document.getElementById('announcer');
+            ann.innerText = text;
+            ann.style.opacity = '1';
+            setTimeout(() => {
+                ann.style.opacity = '0';
+            }, duration);
+        }
+
+        // --- GAME LOOP & ROUND MANAGEMENT ---
+        function startTimer() {
+            clearInterval(gameState.timerInterval);
+            gameState.timeLeft = GAME_CONFIG.roundTime;
+            document.getElementById('timer').innerText = gameState.timeLeft;
+
+            gameState.timerInterval = setInterval(() => {
+                if (gameState.status !== 'FIGHTING') return;
+                gameState.timeLeft--;
+                document.getElementById('timer').innerText = gameState.timeLeft;
+
+                if (gameState.timeLeft <= 0) {
+                    // Time out rule: Whoever has highest health wins
+                    if (p1.health > p2.health) handleRoundOver('p1');
+                    else if (p2.health > p1.health) handleRoundOver('p2');
+                    else handleRoundOver('tie');
+                }
+            }, 1000);
+        }
+
+        function handleRoundOver(winnerId) {
+            gameState.status = 'ROUND_OVER';
+            clearInterval(gameState.timerInterval);
+
+            if (winnerId === 'p1') {
+                gameState.p1RoundsWon++;
+                showAnnouncer('P1 WINS ROUND');
+            } else if (winnerId === 'p2') {
+                gameState.p2RoundsWon++;
+                showAnnouncer('P2 WINS ROUND');
+            } else {
+                showAnnouncer('DRAW');
+            }
+
+            // Update crown indicators
+            document.getElementById('p1-rounds').innerText = '👑'.repeat(gameState.p1RoundsWon);
+            document.getElementById('p2-rounds').innerText = '👑'.repeat(gameState.p2RoundsWon);
+
+            setTimeout(() => {
+                if (gameState.p1RoundsWon >= 2 || gameState.p2RoundsWon >= 2) {
+                    endMatch(gameState.p1RoundsWon >= 2 ? 'PLAYER 1' : 'PLAYER 2');
+                } else {
+                    gameState.round++;
+                    document.getElementById('round-indicator').innerText = `ROUND ${gameState.round}`;
+                    p1.reset(-3);
+                    p2.reset(3);
+                    gameState.status = 'FIGHTING';
+                    showAnnouncer('FIGHT!', 1000);
+                    startTimer();
+                }
+            }, 2500);
+        }
+
+        function endMatch(winnerName) {
+            gameState.status = 'GAME_OVER';
+            document.getElementById('victory-title').innerText = `${winnerName} VICTORIOUS`;
+            document.getElementById('game-over-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            document.getElementById('game-over-modal').classList.add('hidden');
+            gameState.round = 1;
+            gameState.p1RoundsWon = 0;
+            gameState.p2RoundsWon = 0;
+            document.getElementById('p1-rounds').innerText = '👑 👑';
+            document.getElementById('p2-rounds').innerText = '👑 👑';
+            document.getElementById('round-indicator').innerText = 'ROUND 1';
+            
+            p1.reset(-3);
+            p2.reset(3);
+            p1.special = 0;
+            p2.special = 0;
+            updateSpecialDisplay('p1', 0);
+            updateSpecialDisplay('p2', 0);
+
+            gameState.status = 'FIGHTING';
+            showAnnouncer('FIGHT!', 1000);
+            startTimer();
+        });
+
+        // --- ANIMATION / RENDER PIPELINE ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            handleContinuousInput();
+            p1.update(p2);
+            p2.update(p1);
+
+            // Update particle effects
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i];
+                pt.mesh.position.x += pt.vx;
+                pt.mesh.position.y += pt.vy;
+                pt.mesh.position.z += pt.vz;
+                pt.life--;
+                if (pt.life <= 0) {
+                    scene.remove(pt.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Subtle camera tracking between fighters
+            const targetCamX = (p1.x + p2.x) / 2;
+            camera.position.x += (targetCamX - camera.position.x) * 0.05;
+            camera.lookAt(targetCamX, 1.5, 0);
+
+            renderer.render(scene, camera);
+        }
+
+        // Window resize handling
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- GAME STARTUP ---
+        window.onload = function() {
+            showAnnouncer('READY', 1500);
+            setTimeout(() => {
+                showAnnouncer('FIGHT!', 1000);
+                gameState.status = 'FIGHTING';
+                startTimer();
+            }, 1500);
+
+            animate();
+        };
+    </script>
+</body>
+</html>
