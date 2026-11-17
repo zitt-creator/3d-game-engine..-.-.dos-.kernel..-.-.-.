@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Z.ITT // INTRA-KILL  ----  Simulation  --  ///  roadrunner..  . ./.  .MATRIX (EXEC_001)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #030306;
+            color: #00ffcc;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        .mono-font {
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .kirlian-glow {
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.45), inset 0 0 15px rgba(138, 43, 226, 0.35);
+        }
+        .kirlian-border {
+            border: 1px solid rgba(0, 255, 204, 0.6);
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-3 sm:p-5">
+
+    <!-- Header / HUD -->
+    <header class="w-full max-w-6xl flex flex-col md:flex-row items-center justify-between border-b border-cyan-500/40 pb-3 mb-3 gap-3">
+        <div>
+            <h1 class="text-3xl sm:text-4xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-emerald-400 drop-shadow-[0_0_12px_rgba(0,255,204,0.7)]">
+                Z.ITT /// SIMULATION  ///  INTRA--KILL (code-break))..  . ./.  .-roadrunner^¢..  . ./.  --  v.001alpha
+            </h1>
+            <p class="mono-font text-xs sm:text-sm text-cyan-300/80 tracking-widest">
+                STATUS: ACTIVE_VECTOR_MATRIX..  . ./.
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2 justify-center">
+            <button id="modeBoard" class="px-4 py-2 bg-cyan-950/80 kirlian-border text-cyan-300 rounded hover:bg-cyan-900 transition-all font-semibold text-sm shadow-[0_0_10px_rgba(0,255,204,0.2)]">
+                Analouge  ----  Board  ----  Grid Matrix
+            </button>
+            <button id="modeRoom" class="px-4 py-2 bg-purple-950/80 border border-purple-500/60 text-purple-300 rounded hover:bg-purple-900 transition-all font-semibold text-sm shadow-[0_0_10px_rgba(138,43,226,0.2)]">
+                2D  ///  3D   .Intra----Kill..  . ./.    ..  . ./.  ----  Room (.45mm)
+            </button>
+            <button id="triggerDischarge" class="px-4 py-2 bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 rounded hover:bg-emerald-900 transition-all font-semibold text-sm shadow-[0_0_10px_rgba(0,255,100,0.2)]">
+                Discharge Energy
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Simulation Viewport Container -->
+    <main class="w-full max-w-6xl flex-grow relative kirlian-border rounded-xl overflow-hidden bg-black/90 shadow-[0_0_35px_rgba(0,255,204,0.18)] flex flex-col items-center justify-center min-h-[520px]">
+        <div id="canvas-container" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+        <!-- Interactive Overlay HUD -->
+        <div class="absolute top-4 left-4 pointer-events-none bg-black/70 p-3 rounded-lg kirlian-border backdrop-blur-md max-w-xs">
+            <div class="text-xs text-cyan-400 mono-font font-bold mb-1">ENTITY TELEMETRY:</div>
+            <div id="telemetryText" class="text-xs text-slate-300 mono-font space-y-1">
+                <div>MODE: ANALOUGE  ---- BOARD</div>
+                <div>TEXTURES: HIRES 2D->3D VECTOR</div>
+                <div>KIRLIAN^¢ VOLTAGE: 45.8 kV</div>
+                <div>INTERACTION: DRAG TO ROTATE</div>
+            </div>
+        </div>
+
+        <!-- Action Feedback Box -->
+        <div id="feedbackBox" class="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none bg-cyan-950/90 px-6 py-2 rounded-full kirlian-border text-cyan-300 mono-font text-xs sm:text-sm tracking-wider opacity-0 transition-opacity duration-300 shadow-[0_0_20px_rgba(0,255,204,0.5)]">
+            SYSTEM DISCHARGE ACTIVATED // .45MM GUNSHOT FIRED
+        </div>
+    </main>
+
+    <!-- Footer Controls & Info -->
+    <footer class="w-full max-w-6xl mt-3 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 mono-font gap-2">
+        <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>POST-PROCESS==physics.. . ./ [..  . ./.]</span>
+        </div>
+        <div>
+            <span>[Click & Drag to rotate camera • Click canvas for .45mm Gunshot + Vector Discharge]</span>
+        </div>
+    </footer>
+
+    <script>
+        let scene, camera, renderer;
+        let currentMode = 'board';
+        let boardGroup, roomGroup, particleSystem;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let cameraAngleX = 0, cameraAngleY = 0.8;
+        let cameraDistance = 22;
+        let audioCtx = null;
+
+        window.onload = function() {
+            initThreeJS();
+            setupEventListeners();
+            animate();
+        };
+
+        function playGunshotSound() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const t = audioCtx.currentTime;
+                const bufferSize = audioCtx.sampleRate * 0.5;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(800, t);
+                filter.frequency.exponentialRampToValueAtTime(120, t + 0.3);
+                filter.Q.setValueAtTime(1.5, t);
+
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(1.0, t);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                noise.start(t);
+                noise.stop(t + 0.45);
+
+                const osc = audioCtx.createOscillator();
+                const oscGain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(30, t + 0.2);
+
+                oscGain.gain.setValueAtTime(0.8, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+
+                osc.connect(oscGain);
+                oscGain.connect(audioCtx.destination);
+
+                osc.start(t);
+                osc.stop(t + 0.2);
+
+            } catch (e) {
+                console.log("Audio context prevented or unsupported", e);
+            }
+        }
+
+        function createVectorTexture(type) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#050811';
+            ctx.fillRect(0, 0, 1024, 1024);
+
+            if (type === 'crocodile') {
+                ctx.strokeStyle = '#00ffcc';
+                ctx.lineWidth = 12;
+                ctx.shadowColor = '#00ffcc';
+                ctx.shadowBlur = 15;
+
+                ctx.beginPath();
+                ctx.moveTo(512, 100);
+                ctx.lineTo(800, 300);
+                ctx.lineTo(850, 700);
+                ctx.lineTo(512, 950);
+                ctx.lineTo(174, 700);
+                ctx.lineTo(224, 300);
+                ctx.closePath();
+                ctx.stroke();
+
+                ctx.fillStyle = '#aa00ff';
+                for (let i = 0; i < 6; i++) {
+                    ctx.beginPath();
+                    ctx.arc(512, 250 + i * 100, 45 - i * 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = '#00ffcc';
+                ctx.font = 'bold 36px monospace';
+                ctx.fillText('Z.ITT // CROC_VEC_45', 280, 880);
+
+            } else if (type === 'board_grid') {
+                ctx.strokeStyle = '#00ffcc';
+                ctx.lineWidth = 8;
+                ctx.strokeRect(50, 50, 924, 924);
+
+                ctx.strokeStyle = '#aa00ff';
+                ctx.lineWidth = 4;
+                for (let i = 1; i < 8; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(50, i * 115);
+                    ctx.lineTo(974, i * 115);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(i * 115, 50);
+                    ctx.lineTo(i * 115, 974);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = '#00ff88';
+                ctx.font = 'bold 42px monospace';
+                ctx.fillText('ANALOUGE MATRIX GRID // Z.ITT', 120, 100);
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020205);
+            scene.fog = new THREE.FogExp2(0x020205, 0.035);
+
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+            updateCameraPosition();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0x112244, 2);
+            scene.add(ambientLight);
+
+            const cyanLight = new THREE.PointLight(0x00ffcc, 4, 50);
+            cyanLight.position.set(0, 10, 0);
+            scene.add(cyanLight);
+
+            const purpleLight = new THREE.PointLight(0xaa00ff, 4, 50);
+            purpleLight.position.set(10, -5, 10);
+            scene.add(purpleLight);
+
+            buildBoardScene();
+            buildRoomScene();
+
+            roomGroup.visible = false;
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function buildBoardScene() {
+            boardGroup = new THREE.Group();
+
+            const gridTex = createVectorTexture('board_grid');
+            const boardGeo = new THREE.BoxGeometry(16, 0.4, 16);
+            const boardMat = new THREE.MeshStandardMaterial({
+                map: gridTex,
+                roughness: 0.2,
+                metalness: 0.8,
+                emissive: 0x001122,
+                emissiveIntensity: 0.5
+            });
+            const boardMesh = new THREE.Mesh(boardGeo, boardMat);
+            boardMesh.position.y = -0.2;
+            boardGroup.add(boardMesh);
+
+            const centerGeo = new THREE.BoxGeometry(6, 0.5, 6);
+            const centerMat = new THREE.MeshStandardMaterial({
+                color: 0x110022,
+                emissive: 0xaa00ff,
+                emissiveIntensity: 0.8
+            });
+            const centerMesh = new THREE.Mesh(centerGeo, centerMat);
+            centerMesh.position.y = 0.05;
+            boardGroup.add(centerMesh);
+
+            const crocCount = 28;
+            for (let i = 0; i < crocCount; i++) {
+                const angle = (i / crocCount) * Math.PI * 2;
+                const radius = 6.8;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+
+                const croc = createCrocToken();
+                croc.position.set(x, 0.2, z);
+                croc.rotation.y = -angle + Math.PI / 2;
+                boardGroup.add(croc);
+            }
+
+            scene.add(boardGroup);
+        }
+
+        function createCrocToken() {
+            const group = new THREE.Group();
+            const crocTex = createVectorTexture('crocodile');
+
+            const bodyGeo = new THREE.ConeGeometry(0.35, 1.3, 5);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                map: crocTex,
+                color: 0x00ffcc,
+                emissive: 0x00aa88,
+                emissiveIntensity: 0.6,
+                metalness: 0.6,
+                roughness: 0.2
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.rotation.x = Math.PI / 2;
+            group.add(body);
+
+            const tagGeo = new THREE.BoxGeometry(0.25, 0.1, 0.25);
+            const tagMat = new THREE.MeshStandardMaterial({
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                emissiveIntensity: 1.0
+            });
+            const tag = new THREE.Mesh(tagGeo, tagMat);
+            tag.position.set(0, 0.25, 0);
+            group.add(tag);
+
+            return group;
+        }
+
+        function buildRoomScene() {
+            roomGroup = new THREE.Group();
+
+            const floorGeo = new THREE.PlaneGeometry(20, 20);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x1a0a00,
+                roughness: 0.4,
+                metalness: 0.2,
+                emissive: 0x330011,
+                emissiveIntensity: 0.3
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            roomGroup.add(floor);
+
+            const gunGroup = new THREE.Group();
+            const barrelGeo = new THREE.BoxGeometry(0.6, 0.4, 2.2);
+            const gunTex = createVectorTexture('crocodile');
+            const gunMat = new THREE.MeshStandardMaterial({
+                map: gunTex,
+                color: 0x8899aa,
+                metalness: 0.9,
+                roughness: 0.2,
+                emissive: 0x00ffff,
+                emissiveIntensity: 0.5
+            });
+            const barrel = new THREE.Mesh(barrelGeo, gunMat);
+            barrel.position.set(0, 0.2, 0);
+            gunGroup.add(barrel);
+
+            const handleGeo = new THREE.BoxGeometry(0.5, 1.2, 0.6);
+            const handleMat = new THREE.MeshStandardMaterial({
+                color: 0x3a1a00,
+                roughness: 0.5
+            });
+            const handle = new THREE.Mesh(handleGeo, handleMat);
+            handle.position.set(0, -0.5, -0.6);
+            handle.rotation.x = -Math.PI / 6;
+            gunGroup.add(handle);
+
+            gunGroup.position.set(-2, 0.2, 1);
+            gunGroup.rotation.y = Math.PI / 4;
+            roomGroup.add(gunGroup);
+
+            const treeGroup = new THREE.Group();
+            const trunkGeo = new THREE.CylinderGeometry(0.1, 0.2, 1.5, 5);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3319 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 0.75;
+            treeGroup.add(trunk);
+
+            const foliageGeo = new THREE.DodecahedronGeometry(0.8, 1);
+            const foliageMat = new THREE.MeshStandardMaterial({
+                color: 0x00ff88,
+                emissive: 0x00ff88,
+                emissiveIntensity: 0.7,
+                wireframe: true
+            });
+            const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+            foliage.position.y = 1.8;
+            treeGroup.add(foliage);
+
+            treeGroup.position.set(3, 0, -2);
+            roomGroup.add(treeGroup);
+
+            const bossCroc = createCrocToken();
+            bossCroc.scale.set(2.5, 2.5, 2.5);
+            bossCroc.position.set(-3, 0.5, -3);
+            bossCroc.rotation.y = Math.PI / 3;
+            roomGroup.add(bossCroc);
+
+            const flashGeo = new THREE.SphereGeometry(0.9, 8, 8);
+            const flashMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                wireframe: true
+            });
+            const flashMesh = new THREE.Mesh(flashGeo, flashMat);
+            flashMesh.name = "gunshotFlash";
+            flashMesh.position.set(-1.4, 0.6, 1.8);
+            flashMesh.visible = false;
+            roomGroup.add(flashMesh);
+
+            scene.add(roomGroup);
+        }
+
+        function createEnergyDischarge() {
+            playGunshotSound();
+
+            const particleCount = 300;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            const colorOptions = [
+                new THREE.Color(0x00ffcc),
+                new THREE.Color(0xaa00ff),
+                new THREE.Color(0xffffff)
+            ];
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 2;
+                positions[i+1] = Math.random() * 2;
+                positions[i+2] = (Math.random() - 0.5) * 2;
+
+                const col = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+                colors[i] = col.r;
+                colors[i+1] = col.g;
+                colors[i+2] = col.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.3,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
+
+            if (particleSystem) {
+                scene.remove(particleSystem);
+            }
+
+            particleSystem = new THREE.Points(geometry, material);
+            particleSystem.position.set(currentMode === 'room' ? -2 : 0, 1, currentMode === 'room' ? 1 : 0);
+            scene.add(particleSystem);
+
+            const feedback = document.getElementById('feedbackBox');
+            feedback.style.opacity = '1';
+            setTimeout(() => {
+                feedback.style.opacity = '0';
+            }, 2000);
+
+            if (currentMode === 'room') {
+                const flash = roomGroup.getObjectByName("gunshotFlash");
+                if (flash) {
+                    flash.visible = true;
+                    setTimeout(() => { flash.visible = false; }, 120);
+                }
+            }
+        }
+
+        function updateCameraPosition() {
+            camera.position.x = cameraDistance * Math.sin(cameraAngleX) * Math.cos(cameraAngleY);
+            camera.position.y = cameraDistance * Math.sin(cameraAngleY);
+            camera.position.z = cameraDistance * Math.cos(cameraAngleX) * Math.cos(cameraAngleY);
+            camera.lookAt(0, 0, 0);
+        }
+
+        function setupEventListeners() {
+            const container = document.getElementById('canvas-container');
+
+            container.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+
+                cameraAngleX -= deltaX * 0.008;
+                cameraAngleY = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, cameraAngleY + deltaY * 0.008));
+                updateCameraPosition();
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('mouseup', () => { isDragging = false; });
+
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    isDragging = true;
+                    previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+            });
+
+            window.addEventListener('touchmove', (e) => {
+                if (!isDragging || e.touches.length !== 1) return;
+                const deltaX = e.touches[0].clientX - previousMousePosition.x;
+                const deltaY = e.touches[0].clientY - previousMousePosition.y;
+
+                cameraAngleX -= deltaX * 0.008;
+                cameraAngleY = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, cameraAngleY + deltaY * 0.008));
+                updateCameraPosition();
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            });
+
+            window.addEventListener('touchend', () => { isDragging = false; });
+
+            container.addEventListener('click', () => {
+                createEnergyDischarge();
+            });
+
+            document.getElementById('modeBoard').addEventListener('click', () => {
+                currentMode = 'board';
+                boardGroup.visible = true;
+                roomGroup.visible = false;
+                if (particleSystem) scene.remove(particleSystem);
+                document.getElementById('telemetryText').innerHTML = `
+                    <div>MODE: ANALOUGE  ---- BOARD</div>
+                    <div>TEXTURES: HIRES 2D->3D VECTOR</div>
+                    <div>KIRLIAN^¢ VOLTAGE: 45.8 kV</div>
+                    <div>INTERACTION: DRAG TO ROTATE</div>
+                `;
+            });
+
+            document.getElementById('modeRoom').addEventListener('click', () => {
+                currentMode = 'room';
+                boardGroup.visible = false;
+                roomGroup.visible = true;
+                if (particleSystem) scene.remove(particleSystem);
+                document.getElementById('telemetryText').innerHTML = `
+                    <div>MODE: INTRA--KILL  ----  ROOM..  . ./.</div>
+                    <div>ELEMENT: .45MM COLT / GUNSHOT</div>
+                    <div>KIRLIAN^¢ VOLTAGE: 88.2 kV</div>
+                    <div>INTERACTION: CLICK FOR .45MM BLAST</div>
+                `;
+            });
+
+            document.getElementById('triggerDischarge').addEventListener('click', () => {
+                createEnergyDischarge();
+            });
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (currentMode === 'board' && boardGroup) {
+                boardGroup.rotation.y += 0.001;
+            } else if (currentMode === 'room' && roomGroup) {
+                roomGroup.rotation.y += 0.0005;
+            }
+
+            if (particleSystem) {
+                const positions = particleSystem.geometry.attributes.position.array;
+                for (let i = 1; i < positions.length; i += 3) {
+                    positions[i] += 0.03;
+                    if (positions[i] > 6) positions[i] = 0;
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+                particleSystem.rotation.y += 0.02;
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
