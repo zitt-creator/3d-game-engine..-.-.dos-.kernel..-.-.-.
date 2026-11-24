@@ -1,5 +1,5 @@
 #####
-updated  last.02200011000260sulu..  . ./.
+updated  last.02400011000260sulu..  . ./.
 #
 s u s e  start..  . ./.
 #
@@ -19,6 +19,18 @@ s u s e  start..  . ./.
 #
 https://github.com/user-attachments/assets/5bc9ae39-87dc-49d8-835b-6fbe63ffaafd
 #
+::
+#
+##
+##
+::
+#
+::
+
+https://github.com/user-attachments/assets/b4634f45-57bd-45ab-b2b7-58240c3250a9
+
+
+::
 #
 # n o t e
 project==create 3d-game from 2d-vector graphics and pre  ///  post  /  -cache-compile[47] game-engine process..  . .
