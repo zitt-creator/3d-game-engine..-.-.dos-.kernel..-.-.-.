@@ -1,5 +1,5 @@
 #####
-updated  last.02400011000260sulu..  . ./.
+updated  last.02800011000260sulu..  . ./.
 #
 s u s e  start..  . ./.
 #
@@ -49,6 +49,16 @@ replicate  ///  clone  /  .png textures
 #####
 ##
 ##
+# n o t e
+# mobile workstation..  . ./.
+Samsung Galaxy Xcover----5
+#
+https://www.samsung.com/de/support/model/SM-G525FZKDEEB/
+#
+##
+##
+#
+#####
 #
 ::
 #
